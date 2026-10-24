@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Boxes,
   RefreshCw,
+  Percent,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthContext";
@@ -255,6 +256,11 @@ export default function Sidebar({
         items: [
           { name: "Orders", path: "/admin/orders", icon: ShoppingCart, badge: counts.orders, badgeType: "blue" },
           { name: "Payments & Invoices", path: "/admin/payments", icon: CreditCard },
+          {
+            name: "Holding & Commission",
+            path: "/admin/commission-rules",
+            icon: Percent,
+          },
           {
             name: "Pending Refunds",
             path: "/admin/refunds",

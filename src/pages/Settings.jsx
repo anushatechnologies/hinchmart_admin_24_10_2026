@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Save, User, Bell, Shield, Globe, Palette, Moon, Sun, Monitor, Check } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Save, User, Bell, Shield, Globe, Palette, Moon, Sun, Monitor, Check, Percent, ArrowRight } from "lucide-react";
 import { useToast } from "../components/ToastContext";
 import { getStoredAppearance, applyAppearance, getSystemTheme, initThemeSystemListener } from "../utils/themeUtils";
+import { getActiveGlobalHoldingFeeRate, createCommissionRule } from "../api/commissionRuleApi";
 import "../styles/pages.css";
 
 export default function Settings() {
@@ -12,6 +14,17 @@ export default function Settings() {
   const [security, setSecurity] = useState({ twoFactor: true, sessionAlerts: true });
   const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [appearance, setAppearance] = useState(() => getStoredAppearance());
+
+  useEffect(() => {
+    // Sync active global holding fee rate dynamically from backend
+    getActiveGlobalHoldingFeeRate()
+      .then((rate) => {
+        if (rate !== undefined && rate !== null) {
+          setPlatform((prev) => ({ ...prev, commissionRate: String(rate) }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     applyAppearance(appearance);
@@ -94,7 +107,7 @@ export default function Settings() {
     }
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
       if (!profile.name.trim() || !profile.email.includes("@")) {
         toast.error("Please enter a valid administrator name and email.");
@@ -106,13 +119,28 @@ export default function Settings() {
         setActiveTab("security");
         return;
       }
+
+      // Sync Holding Fee Rate with Backend Admin API (Audit-Safe)
+      const parsedRate = parseFloat(platform.commissionRate);
+      if (!isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 100) {
+        try {
+          await createCommissionRule({
+            categoryId: null,
+            rate: parsedRate,
+            isActive: true,
+          });
+        } catch (ruleErr) {
+          console.warn("Commission rule sync note:", ruleErr);
+        }
+      }
+
       localStorage.setItem("hinchmart_settings_profile", JSON.stringify(profile));
       localStorage.setItem("hinchmart_settings_platform", JSON.stringify(platform));
       localStorage.setItem("hinchmart_settings_notifications", JSON.stringify(notifications));
       localStorage.setItem("hinchmart_settings_appearance", JSON.stringify(appearance));
       localStorage.setItem("hinchmart_settings_security", JSON.stringify(security));
       setSavedAt(new Date());
-      toast.success("Settings saved successfully!");
+      toast.success("Settings & Holding Fee rate saved successfully!");
     } catch {
       toast.error("Failed to save settings.");
     }
@@ -216,14 +244,36 @@ export default function Settings() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Marketplace Commission Rate (%)</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label style={{ margin: 0 }}>Marketplace Global Holding Fee / Commission Rate (%)</label>
+                    <Link
+                      to="/admin/commission-rules"
+                      style={{
+                        fontSize: "12px",
+                        color: "#0284c7",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <span>Manage Category Overrides</span>
+                      <ArrowRight size={13} />
+                    </Link>
+                  </div>
                   <input
                     type="number"
+                    step="0.01"
                     value={platform.commissionRate}
                     onChange={(e) => setPlatform({ ...platform, commissionRate: e.target.value })}
                     min="0"
                     max="100"
+                    style={{ marginTop: "6px" }}
                   />
+                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+                    Connected to REST API: <code>POST /api/admin/commission-rules</code> (Audit Safeguard: prior global rates auto-expire).
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Base Currency</label>

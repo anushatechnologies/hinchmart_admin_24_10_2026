@@ -36,6 +36,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const VendorStock = lazy(() => import("./pages/VendorStock"));
 const Refunds = lazy(() => import("./pages/Refunds"));
+const CommissionRules = lazy(() => import("./pages/CommissionRules"));
 
 // Components
 import AdminLayout from "./components/AdminLayout";
@@ -53,6 +54,7 @@ import "./styles/banners.css";
 import "./styles/coupons.css";
 import "./styles/hotDeals.css";
 import "./styles/dashboard.css";
+import "./styles/commissionRules.css";
 
 function ProtectedAdminRoute() {
   const { isAuthenticated, loading } = useAuth();
@@ -139,6 +141,8 @@ function AppRoutes() {
           <Route path="payments" element={<Payments />} />
           <Route path="payments/:id" element={<PaymentDetails />} />
           <Route path="refunds" element={<Refunds />} />
+          <Route path="commission-rules" element={<CommissionRules />} />
+          <Route path="holding-fees" element={<CommissionRules />} />
           <Route path="shipments" element={<Shipments />} />
           <Route path="shipments/:id" element={<ShipmentDetails />} />
           <Route path="rfqs" element={<RFQs />} />

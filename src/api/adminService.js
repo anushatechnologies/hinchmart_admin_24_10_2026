@@ -939,6 +939,97 @@ export const AdminService = {
     const response = await api.delete(`/brands/${id}`);
     return response.data !== undefined ? response.data : response;
   },
+
+  // ==========================================
+  // 13. Commission Rules & Holding Fees ($X%)
+  // ==========================================
+  getCommissionRules: async (params = {}) => {
+    try {
+      const response = await api.get("/admin/commission-rules", { params });
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.get("/admin/holding-fees", { params });
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
+
+  getCommissionRuleById: async (id) => {
+    try {
+      const response = await api.get(`/admin/commission-rules/${id}`);
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.get(`/admin/holding-fees/${id}`);
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
+
+  createCommissionRule: async (data) => {
+    try {
+      const response = await api.post("/admin/commission-rules", data);
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.post("/admin/holding-fees", data);
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
+
+  updateCommissionRule: async (id, data) => {
+    try {
+      const response = await api.put(`/admin/commission-rules/${id}`, data);
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.put(`/admin/holding-fees/${id}`, data);
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
+
+  toggleCommissionRuleStatus: async (id, isActive) => {
+    const active = Boolean(isActive);
+    try {
+      const response = await api.patch(
+        `/admin/commission-rules/${id}/status`,
+        { isActive: active },
+        { params: { active } }
+      );
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.patch(
+          `/admin/holding-fees/${id}/status`,
+          { isActive: active },
+          { params: { active } }
+        );
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
+
+  deleteCommissionRule: async (id) => {
+    try {
+      const response = await api.delete(`/admin/commission-rules/${id}`);
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const alt = await api.delete(`/admin/holding-fees/${id}`);
+        return alt.data !== undefined ? alt.data : alt;
+      }
+      throw err;
+    }
+  },
 };
 
 export default AdminService;
+
