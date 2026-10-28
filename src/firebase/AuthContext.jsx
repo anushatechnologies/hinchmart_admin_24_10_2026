@@ -23,81 +23,59 @@ const AuthContext = createContext({
 });
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("adminUser");
-        return saved ? JSON.parse(saved) : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
-  const [token, setToken] = useState(() => {
-    if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem("adminToken") ||
-        localStorage.getItem("accessToken") ||
-        null
-      );
-    }
-    return null;
-  });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      // If token exists, we are already ready to render without full-screen blocking
-      return (
-        !localStorage.getItem("adminToken") &&
-        !localStorage.getItem("accessToken") &&
-        !localStorage.getItem("adminUser")
-      );
-    }
-    return true;
-  });
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Safety timer: Never leave the entire app stuck on full-screen loading spinner
+    // Safety timer: Never leave app stuck on full-screen loading spinner
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-    }, 600);
+    }, 1200);
 
     const unsubscribe = onAuthStateChangedListener(async (currentUser) => {
       clearTimeout(safetyTimer);
       if (currentUser) {
         setUser(currentUser);
-        const storedBackendToken =
-          typeof window !== "undefined"
-            ? localStorage.getItem("adminToken") || localStorage.getItem("accessToken")
-            : null;
-
-        if (storedBackendToken) {
-          setToken(storedBackendToken);
-        } else {
-          try {
-            const idToken = await currentUser.getIdToken();
-            setToken(idToken);
-          } catch {
-            // Keep existing token if refresh fails momentarily
+        try {
+          const idToken = await currentUser.getIdToken();
+          setToken(idToken);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("firebaseToken", idToken);
           }
+        } catch {
+          // Token retrieval failure
         }
       } else {
-        // Only clear if localStorage also doesn't have an active admin session
-        const storedToken =
-          typeof window !== "undefined"
-            ? localStorage.getItem("adminToken") || localStorage.getItem("accessToken")
-            : null;
-        if (!storedToken) {
-          setUser(null);
-          setToken(null);
+        // Firebase has confirmed no active session exists: purge stale session
+        setUser(null);
+        setToken(null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("adminToken");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("firebaseToken");
+          localStorage.removeItem("adminUser");
+          localStorage.removeItem("userRole");
         }
       }
       setLoading(false);
     });
 
-    const handleSessionExpired = () => {
+    const handleSessionExpired = async () => {
       setUser(null);
       setToken(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("adminToken");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("firebaseToken");
+        localStorage.removeItem("adminUser");
+        localStorage.removeItem("userRole");
+      }
+      try {
+        await logoutUser();
+      } catch {}
     };
     window.addEventListener("auth:session_expired", handleSessionExpired);
 
@@ -143,7 +121,7 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
-    isAuthenticated: !!user || !!token,
+    isAuthenticated: Boolean(user && token),
     login: handleLogin,
     loginWithGoogle: handleGoogleLogin,
     register: handleRegister,

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebaseConfig";
 
 const configuredBaseUrl =
@@ -82,11 +83,7 @@ const resolveRequestToken = async () => {
     }
   }
 
-  // 2. Fast-path: Check stored token in localStorage immediately (0ms delay)
-  const storedToken = getActiveAccessToken();
-  if (storedToken) return storedToken;
-
-  // 3. Fallback: Wait briefly for Firebase Auth to rehydrate
+  // 2. Wait briefly for Firebase Auth to rehydrate from IndexedDB
   const currentUser = await waitForFirebaseUser();
   if (currentUser) {
     try {
@@ -99,6 +96,10 @@ const resolveRequestToken = async () => {
       console.warn("Failed to retrieve Firebase ID token fallback:", err?.message);
     }
   }
+
+  // 3. Last fallback: Check stored token in localStorage
+  const storedToken = getActiveAccessToken();
+  if (storedToken) return storedToken;
 
   return null;
 };
@@ -163,7 +164,10 @@ const processFailedQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-export const purgeSessionAndRedirect = (force = false) => {
+let isRedirectingToLogin = false;
+let lastSessionExpiredDispatch = 0;
+
+export const purgeSessionAndRedirect = async (force = false) => {
   if (typeof window === "undefined") return;
   if (!force && window.location.pathname.includes("/login")) {
     return;
@@ -178,7 +182,13 @@ export const purgeSessionAndRedirect = (force = false) => {
     localStorage.removeItem("userRole");
   } catch {}
 
-  if (typeof window.dispatchEvent === "function") {
+  try {
+    await signOut(auth);
+  } catch {}
+
+  const now = Date.now();
+  if (now - lastSessionExpiredDispatch > 3000 && typeof window.dispatchEvent === "function") {
+    lastSessionExpiredDispatch = now;
     window.dispatchEvent(
       new CustomEvent("auth:session_expired", {
         detail: {
@@ -192,8 +202,8 @@ export const purgeSessionAndRedirect = (force = false) => {
     isRedirectingToLogin = true;
     setTimeout(() => {
       isRedirectingToLogin = false;
-      window.location.href = "/login";
-    }, 400);
+      window.location.replace("/login");
+    }, 300);
   }
 };
 
@@ -229,7 +239,7 @@ api.interceptors.response.use(
 
       // If the failing request was itself /auth/sync or /auth/logout, fail directly without re-attempting
       if (requestUrl.includes("/auth/sync") || requestUrl.includes("/auth/logout")) {
-        purgeSessionAndRedirect();
+        await purgeSessionAndRedirect();
         return Promise.reject(error);
       }
 
@@ -265,34 +275,40 @@ api.interceptors.response.use(
           throw new Error("Unable to obtain fresh Firebase ID token.");
         }
 
-        // Step 2: Call POST /api/auth/sync with the new Firebase ID token to obtain a fresh accessToken
+        // Step 2: Call POST /api/auth/sync with the new Firebase ID token
         const syncUrl = `${apiBaseUrl}/auth/sync`;
-        const syncResponse = await axios.post(
-          syncUrl,
-          {
-            firebaseIdToken: freshFirebaseToken,
-            name: currentUser.displayName || undefined,
-            email: currentUser.email || undefined,
-            phone: currentUser.phoneNumber || undefined,
-            role: "ADMIN",
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${freshFirebaseToken}`,
+        let newAccessToken = freshFirebaseToken;
+        try {
+          const syncResponse = await axios.post(
+            syncUrl,
+            {
+              firebaseIdToken: freshFirebaseToken,
+              name: currentUser.displayName || undefined,
+              email: currentUser.email || undefined,
+              phone: currentUser.phoneNumber || undefined,
+              role: "ADMIN",
             },
-            timeout: 15000,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${freshFirebaseToken}`,
+              },
+              timeout: 15000,
+            }
+          );
+
+          const responseData = syncResponse.data?.data || syncResponse.data;
+          if (responseData?.accessToken) {
+            newAccessToken = responseData.accessToken;
           }
-        );
-
-        const responseData = syncResponse.data?.data || syncResponse.data;
-        const newAccessToken = responseData?.accessToken;
-
-        if (!newAccessToken) {
-          throw new Error("Backend did not return a valid accessToken on /api/auth/sync.");
+        } catch (syncErr) {
+          console.warn("Silent token sync notice:", syncErr?.message);
+          if (syncErr.response?.status === 401 || syncErr.response?.status === 403) {
+            throw syncErr;
+          }
         }
 
-        // Store new HinchMart JWT accessToken
+        // Store new active token
         if (typeof window !== "undefined") {
           localStorage.setItem("adminToken", newAccessToken);
           localStorage.setItem("accessToken", newAccessToken);
@@ -302,14 +318,14 @@ api.interceptors.response.use(
 
         processFailedQueue(null, newAccessToken);
 
-        // Step 3: Retry original failed request with the new accessToken
+        // Step 3: Retry original failed request with the new token
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshErr) {
         console.warn("Silent token exchange notice on 401:", refreshErr?.message);
         processFailedQueue(refreshErr, null);
-        purgeSessionAndRedirect(true);
+        await purgeSessionAndRedirect(true);
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
@@ -318,6 +334,6 @@ api.interceptors.response.use(
 
     return Promise.reject(error);
   }
-);
+);;
 
 export default api;

@@ -663,16 +663,13 @@ export const onAuthStateChangedListener = (callback) => {
         }
       } catch {}
     } else {
-      const storedToken = typeof window !== "undefined" ? (localStorage.getItem("adminToken") || localStorage.getItem("accessToken")) : null;
-      if (!storedToken) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("adminToken");
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("firebaseToken");
-          localStorage.removeItem("userRole");
-          localStorage.removeItem("adminUser");
-        }
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("adminToken");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("firebaseToken");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("adminUser");
       }
     }
     callback(user);
