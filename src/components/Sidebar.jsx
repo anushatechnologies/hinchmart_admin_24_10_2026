@@ -71,6 +71,11 @@ export default function Sidebar({
     let mounted = true;
 
     const refreshCounts = async () => {
+      // Don't fire authenticated count fetches if there is no active session
+      if (!user && !localStorage.getItem("adminToken") && !localStorage.getItem("accessToken")) {
+        return;
+      }
+
       try {
         const [
           buyersData,

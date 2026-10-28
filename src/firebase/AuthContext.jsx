@@ -95,9 +95,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
+    const handleSessionExpired = () => {
+      setUser(null);
+      setToken(null);
+    };
+    window.addEventListener("auth:session_expired", handleSessionExpired);
+
     return () => {
       clearTimeout(safetyTimer);
       unsubscribe();
+      window.removeEventListener("auth:session_expired", handleSessionExpired);
     };
   }, []);
 

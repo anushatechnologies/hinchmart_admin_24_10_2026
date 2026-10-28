@@ -163,26 +163,37 @@ const processFailedQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-let isRedirectingToLogin = false;
+export const purgeSessionAndRedirect = (force = false) => {
+  if (typeof window === "undefined") return;
+  if (!force && window.location.pathname.includes("/login")) {
+    return;
+  }
 
-const purgeSessionAndRedirect = (force = false) => {
-  if (!isRedirectingToLogin && typeof window !== "undefined") {
-    // If we are not forcing and there is already an active token or on login page, avoid reload loop
-    if (!force && (localStorage.getItem("adminToken") || localStorage.getItem("accessToken") || window.location.pathname.includes("/login"))) {
-      return;
-    }
-    if (!window.location.pathname.includes("/login")) {
-      isRedirectingToLogin = true;
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("firebaseToken");
-      localStorage.removeItem("adminUser");
-      localStorage.removeItem("userRole");
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 500);
-    }
+  try {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("firebaseToken");
+    localStorage.removeItem("adminUser");
+    localStorage.removeItem("userRole");
+  } catch {}
+
+  if (typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(
+      new CustomEvent("auth:session_expired", {
+        detail: {
+          message: "Your admin session token has expired. Please log in again to renew your access.",
+        },
+      })
+    );
+  }
+
+  if (!isRedirectingToLogin && !window.location.pathname.includes("/login")) {
+    isRedirectingToLogin = true;
+    setTimeout(() => {
+      isRedirectingToLogin = false;
+      window.location.href = "/login";
+    }, 400);
   }
 };
 
@@ -298,16 +309,7 @@ api.interceptors.response.use(
       } catch (refreshErr) {
         console.warn("Silent token exchange notice on 401:", refreshErr?.message);
         processFailedQueue(refreshErr, null);
-        // Notify the application that session token has expired
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(
-            new CustomEvent("auth:session_expired", {
-              detail: {
-                message: "Your admin session token has expired. Please log in again to renew your access.",
-              },
-            })
-          );
-        }
+        purgeSessionAndRedirect(true);
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
