@@ -1029,7 +1029,44 @@ export const AdminService = {
       throw err;
     }
   },
+
+  // ==========================================
+  // 14. Fleet & Logistics Vehicle Types (HinchExpress Microservice)
+  // ==========================================
+  getVehicleTypes: async () => {
+    try {
+      const response = await api.get("/admin/vehicle-types");
+      return response.data !== undefined ? response.data : response;
+    } catch (err) {
+      const alt = await api.get("/vehicle-types");
+      return alt.data !== undefined ? alt.data : alt;
+    }
+  },
+
+  createVehicleType: async (data) => {
+    const response = await api.post("/admin/vehicle-types", data);
+    return response.data !== undefined ? response.data : response;
+  },
+
+  updateVehicleType: async (id, data) => {
+    const response = await api.put(`/admin/vehicle-types/${id}`, data);
+    return response.data !== undefined ? response.data : response;
+  },
+
+  deleteVehicleType: async (id) => {
+    const response = await api.delete(`/admin/vehicle-types/${id}`);
+    return response.data !== undefined ? response.data : response;
+  },
+
+  // ==========================================
+  // 15. System Infrastructure & Cache
+  // ==========================================
+  clearAdminCache: async () => {
+    const response = await api.post("/admin/cache/clear");
+    return response.data !== undefined ? response.data : response;
+  },
 };
 
 export default AdminService;
+
 

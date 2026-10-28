@@ -246,6 +246,7 @@ export const getAdminCustomerTickets = async (params = {}) => {
   }
 
   const candidateEndpoints = [
+    { ep: "/admin/support/tickets", params: cleanParams },
     { ep: "/admin/help/tickets", params: cleanParams },
     { ep: "/help/tickets", params: cleanParams },
     { ep: "/admin/customer/tickets", params: cleanParams },
@@ -329,6 +330,7 @@ export const getAdminCustomerTickets = async (params = {}) => {
  */
 export const getAdminCustomerTicketById = async (id) => {
   const candidateEndpoints = [
+    `/admin/support/tickets/${id}`,
     `/admin/help/tickets/${id}`,
     `/help/tickets/${id}`,
     `/admin/customer/tickets/${id}`,
@@ -395,6 +397,7 @@ export const replyToCustomerTicket = async (id, { content, attachmentUrl = null 
   };
 
   const candidateEndpoints = [
+    `/admin/support/tickets/${id}/messages`,
     `/help/tickets/${id}/messages`,
     `/admin/help/tickets/${id}/messages`,
     `/admin/customer/tickets/${id}/messages`,
@@ -465,6 +468,7 @@ export const updateCustomerTicketStatus = async (id, { status, priority = null }
   }
 
   const candidateAttempts = [
+    { method: "put", ep: `/admin/support/tickets/${id}/status` },
     { method: "patch", ep: `/admin/help/tickets/${id}/status` },
     { method: "patch", ep: `/help/tickets/${id}/status` },
     { method: "put", ep: `/help/tickets/${id}` },

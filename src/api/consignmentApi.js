@@ -48,33 +48,41 @@ export const getConsignmentInventory = async ({ page = 1, limit = 20, productId,
   if (vendorStoreId && vendorStoreId !== "ALL") params.set("vendorStoreId", String(vendorStoreId));
   if (isActive !== undefined && isActive !== "ALL") params.set("isActive", String(isActive));
 
-  try {
-    const res = await api.get(`/admin/hinch-store/inventory?${params.toString()}`);
-    let data = res.data?.data || res.data?.items || res.data?.inventory || res.data;
-    if (data && Array.isArray(data.rows || data.content)) {
-      return {
-        rows: (data.rows || data.content).map(normalizeConsignmentRow),
-        pagination: {
-          page: Number(data.page || page),
-          limit: Number(data.limit || limit),
-          totalCount: Number(data.totalCount || data.total || data.count || (data.rows || data.content).length),
-          totalPages: Math.max(1, Math.ceil(Number(data.totalCount || data.total || 1) / limit)),
-        },
-      };
+  const endpoints = [
+    `/admin/consignment-inventory?${params.toString()}`,
+    `/admin/hinch-store/inventory?${params.toString()}`,
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const res = await api.get(ep);
+      let data = res.data?.data || res.data?.items || res.data?.inventory || res.data;
+      if (data && Array.isArray(data.rows || data.content)) {
+        return {
+          rows: (data.rows || data.content).map(normalizeConsignmentRow),
+          pagination: {
+            page: Number(data.page || page),
+            limit: Number(data.limit || limit),
+            totalCount: Number(data.totalCount || data.total || data.count || (data.rows || data.content).length),
+            totalPages: Math.max(1, Math.ceil(Number(data.totalCount || data.total || 1) / limit)),
+          },
+        };
+      }
+      if (Array.isArray(data)) {
+        return {
+          rows: data.map(normalizeConsignmentRow),
+          pagination: {
+            page,
+            limit,
+            totalCount: data.length,
+            totalPages: Math.max(1, Math.ceil(data.length / limit)),
+          },
+        };
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) break;
+      continue;
     }
-    if (Array.isArray(data)) {
-      return {
-        rows: data.map(normalizeConsignmentRow),
-        pagination: {
-          page,
-          limit,
-          totalCount: data.length,
-          totalPages: Math.max(1, Math.ceil(data.length / limit)),
-        },
-      };
-    }
-  } catch (err) {
-    console.warn("[Consignment API] Remote GET failed, falling back to local inventory:", err?.message);
   }
 
   // Fallback to local storage cache
@@ -120,17 +128,25 @@ export const createOrUpdateConsignmentRow = async ({ productId, vendorStoreId, q
     isActive: Boolean(isActive),
   };
 
-  try {
-    const res = await api.post("/admin/hinch-store/inventory", payload);
-    const data = res.data?.data || res.data?.item || res.data;
-    if (data && typeof data === "object") {
-      const normalized = normalizeConsignmentRow(data);
-      syncLocalRow(normalized);
-      dispatchDataUpdate("consignmentInventory", "CREATE", normalized);
-      return normalized;
+  const createEndpoints = [
+    "/admin/consignment-inventory",
+    "/admin/hinch-store/inventory",
+  ];
+
+  for (const ep of createEndpoints) {
+    try {
+      const res = await api.post(ep, payload);
+      const data = res.data?.data || res.data?.item || res.data;
+      if (data && typeof data === "object") {
+        const normalized = normalizeConsignmentRow(data);
+        syncLocalRow(normalized);
+        dispatchDataUpdate("consignmentInventory", "CREATE", normalized);
+        return normalized;
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) break;
+      continue;
     }
-  } catch (err) {
-    console.warn("[Consignment API] Remote POST failed, recording locally:", err?.message);
   }
 
   // Local fallback upsert
@@ -185,17 +201,25 @@ export const createOrUpdateConsignmentRow = async ({ productId, vendorStoreId, q
  */
 export const updateConsignmentRowStatus = async (id, isActive) => {
   const payload = { isActive: Boolean(isActive) };
-  try {
-    const res = await api.patch(`/admin/hinch-store/inventory/${id}/status`, payload);
-    const data = res.data?.data || res.data;
-    if (data) {
-      const normalized = normalizeConsignmentRow(data);
-      syncLocalRow(normalized);
-      dispatchDataUpdate("consignmentInventory", "STATUS_CHANGE", normalized);
-      return normalized;
+  const statusAttempts = [
+    { method: "put", ep: `/admin/consignment-inventory/${id}/status`, payload: { active: Boolean(isActive), isActive: Boolean(isActive) } },
+    { method: "patch", ep: `/admin/hinch-store/inventory/${id}/status`, payload },
+  ];
+
+  for (const attempt of statusAttempts) {
+    try {
+      const res = await api[attempt.method](attempt.ep, attempt.payload);
+      const data = res.data?.data || res.data;
+      if (data) {
+        const normalized = normalizeConsignmentRow(data);
+        syncLocalRow(normalized);
+        dispatchDataUpdate("consignmentInventory", "STATUS_CHANGE", normalized);
+        return normalized;
+      }
+    } catch (err) {
+      if (err?.response?.status === 401) break;
+      continue;
     }
-  } catch (err) {
-    console.warn("[Consignment API] Remote PATCH status failed, updating locally:", err?.message);
   }
 
   const local = getLocalInventory();
