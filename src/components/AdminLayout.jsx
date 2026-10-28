@@ -88,11 +88,14 @@ export default function AdminLayout() {
             </div>
             <button
               onClick={() => {
+                localStorage.removeItem("hinchmart_admin_token");
+                localStorage.removeItem("hinchmart_admin_user");
                 localStorage.removeItem("adminToken");
                 localStorage.removeItem("accessToken");
                 localStorage.removeItem("authToken");
                 localStorage.removeItem("firebaseToken");
                 localStorage.removeItem("adminUser");
+                localStorage.removeItem("userRole");
                 window.location.href = "/login";
               }}
               style={{

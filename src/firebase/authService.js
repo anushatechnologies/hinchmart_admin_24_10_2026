@@ -230,6 +230,8 @@ export const verifyPhoneOtp = async (confirmationResult, otpCode, displayName = 
   };
 
   if (typeof window !== "undefined") {
+    localStorage.setItem("hinchmart_admin_token", activeToken);
+    localStorage.setItem("hinchmart_admin_user", JSON.stringify(adminSession));
     localStorage.setItem("authToken", activeToken);
     localStorage.setItem("adminToken", activeToken);
     localStorage.setItem("accessToken", activeToken);
@@ -327,6 +329,8 @@ export const registerWithEmailPassword = async ({
   };
 
   if (typeof window !== "undefined") {
+    localStorage.setItem("hinchmart_admin_token", activeToken);
+    localStorage.setItem("hinchmart_admin_user", JSON.stringify(adminSession));
     localStorage.setItem("authToken", activeToken);
     localStorage.setItem("adminToken", activeToken);
     localStorage.setItem("accessToken", activeToken);
@@ -422,6 +426,8 @@ export const loginWithEmailPassword = async (email, password, rememberMe = false
 
   // 6. Persist Admin Session & Backend JWT
   if (typeof window !== "undefined") {
+    localStorage.setItem("hinchmart_admin_token", activeToken);
+    localStorage.setItem("hinchmart_admin_user", JSON.stringify(adminSession));
     localStorage.setItem("authToken", activeToken);
     localStorage.setItem("adminToken", activeToken);
     localStorage.setItem("accessToken", activeToken);
@@ -508,6 +514,8 @@ export const loginWithGoogle = async () => {
   };
 
   if (typeof window !== "undefined") {
+    localStorage.setItem("hinchmart_admin_token", activeToken);
+    localStorage.setItem("hinchmart_admin_user", JSON.stringify(adminSession));
     localStorage.setItem("authToken", activeToken);
     localStorage.setItem("adminToken", activeToken);
     localStorage.setItem("accessToken", activeToken);
@@ -553,6 +561,8 @@ export const logoutUser = async () => {
     await signOut(auth);
   } finally {
     if (typeof window !== "undefined") {
+      localStorage.removeItem("hinchmart_admin_token");
+      localStorage.removeItem("hinchmart_admin_user");
       localStorage.removeItem("authToken");
       localStorage.removeItem("adminToken");
       localStorage.removeItem("accessToken");
@@ -664,6 +674,8 @@ export const onAuthStateChangedListener = (callback) => {
       } catch {}
     } else {
       if (typeof window !== "undefined") {
+        localStorage.removeItem("hinchmart_admin_token");
+        localStorage.removeItem("hinchmart_admin_user");
         localStorage.removeItem("authToken");
         localStorage.removeItem("adminToken");
         localStorage.removeItem("accessToken");

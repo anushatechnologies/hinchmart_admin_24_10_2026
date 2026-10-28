@@ -269,6 +269,8 @@ export default function Topbar({
     } catch (err) {
       console.warn("Logout error:", err);
     }
+    localStorage.removeItem("hinchmart_admin_token");
+    localStorage.removeItem("hinchmart_admin_user");
     localStorage.removeItem("adminToken");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("authToken");

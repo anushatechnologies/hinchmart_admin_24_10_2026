@@ -1,9 +1,12 @@
 import api from "./axios";
+import { AdminAuthService } from "./authService";
+
+export { AdminAuthService };
 
 /**
  * AdminService provides unified client methods for all Admin & Moderation endpoints
  * Base URL: https://api.hinchmart.com (or http://localhost:9000)
- * Authentication: Authorization: Bearer <FIREBASE_ID_TOKEN>
+ * Authentication: Authorization: Bearer <hinchmart_admin_token>
  */
 export const AdminService = {
   // ==========================================

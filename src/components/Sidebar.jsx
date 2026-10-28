@@ -72,7 +72,7 @@ export default function Sidebar({
 
     const refreshCounts = async () => {
       // Don't fire authenticated count fetches if there is no active session
-      if (!user && !localStorage.getItem("adminToken") && !localStorage.getItem("accessToken")) {
+      if (!user && !localStorage.getItem("hinchmart_admin_token") && !localStorage.getItem("adminToken") && !localStorage.getItem("accessToken")) {
         return;
       }
 

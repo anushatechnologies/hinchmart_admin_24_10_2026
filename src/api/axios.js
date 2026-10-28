@@ -24,17 +24,33 @@ const api = axios.create({
 
 /**
  * Returns the active HinchMart backend JWT accessToken.
- * Falls back to legacy keys for compatibility.
+ * Priority: hinchmart_admin_token -> adminToken -> accessToken
  */
 export const getActiveAccessToken = () => {
   if (typeof window === "undefined") return null;
   return (
+    localStorage.getItem("hinchmart_admin_token") ||
     localStorage.getItem("adminToken") ||
-    localStorage.getItem("firebaseToken") ||
     localStorage.getItem("accessToken") ||
     localStorage.getItem("authToken") ||
     null
   );
+};
+
+/**
+ * Checks if a JWT token is expired or expiring within 60 seconds
+ */
+export const isTokenExpired = (token) => {
+  if (!token || typeof token !== "string") return true;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000 - 60000;
+  } catch {
+    return true;
+  }
 };
 
 let authRehydrationPromise = null;
@@ -65,43 +81,77 @@ const waitForFirebaseUser = () => {
 };
 
 /**
- * Resolves the token to use for outgoing API requests.
- * All admin requests require the standard Firebase Bearer token:
- * Authorization: Bearer <ADMIN_FIREBASE_ID_TOKEN>
+ * Resolves the HinchMart backend JWT accessToken for outgoing API requests.
+ * Uses 2-Tier Auth:
+ * Tier 1: Check existing valid HinchMart JWT accessToken.
+ * Tier 2: If missing/expired, silently exchange fresh Firebase ID token via POST /api/auth/sync.
  */
 const resolveRequestToken = async () => {
-  // 1. If currentUser is already loaded in Firebase auth instance, get fresh ID token
-  if (auth.currentUser) {
-    try {
-      const idToken = await auth.currentUser.getIdToken();
-      if (typeof window !== "undefined" && idToken) {
-        localStorage.setItem("firebaseToken", idToken);
-      }
-      return idToken;
-    } catch (err) {
-      console.warn("Failed to retrieve Firebase ID token:", err?.message);
-    }
+  // 1. Check existing HinchMart backend JWT
+  const existingToken = getActiveAccessToken();
+  if (existingToken && !isTokenExpired(existingToken)) {
+    return existingToken;
   }
 
-  // 2. Wait briefly for Firebase Auth to rehydrate from IndexedDB
-  const currentUser = await waitForFirebaseUser();
+  // 2. Token missing or expired: Exchange fresh Firebase ID token for HinchMart JWT
+  let currentUser = auth.currentUser;
+  if (!currentUser) {
+    currentUser = await waitForFirebaseUser();
+  }
+
   if (currentUser) {
     try {
-      const idToken = await currentUser.getIdToken();
-      if (typeof window !== "undefined" && idToken) {
-        localStorage.setItem("firebaseToken", idToken);
+      const freshFirebaseToken = await currentUser.getIdToken(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("firebaseToken", freshFirebaseToken);
       }
-      return idToken;
+
+      const syncUrl = `${apiBaseUrl}/auth/sync`;
+      const syncResponse = await axios.post(
+        syncUrl,
+        {
+          firebaseIdToken: freshFirebaseToken,
+          role: "ADMIN",
+          email: currentUser.email || undefined,
+          name: currentUser.displayName || undefined,
+          phone: currentUser.phoneNumber || undefined,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${freshFirebaseToken}`,
+          },
+          timeout: 15000,
+        }
+      );
+
+      const responseData = syncResponse.data?.data || syncResponse.data;
+      const newAccessToken = responseData?.accessToken || responseData?.token;
+
+      if (newAccessToken && typeof window !== "undefined") {
+        localStorage.setItem("hinchmart_admin_token", newAccessToken);
+        localStorage.setItem("adminToken", newAccessToken);
+        localStorage.setItem("accessToken", newAccessToken);
+        if (responseData) {
+          localStorage.setItem(
+            "hinchmart_admin_user",
+            JSON.stringify({
+              userId: responseData.userId || null,
+              email: responseData.email || currentUser.email,
+              name: responseData.name || currentUser.displayName,
+              role: responseData.role || "ADMIN",
+            })
+          );
+        }
+        return newAccessToken;
+      }
     } catch (err) {
-      console.warn("Failed to retrieve Firebase ID token fallback:", err?.message);
+      console.warn("Silent token exchange on request notice:", err?.message);
     }
   }
 
-  // 3. Last fallback: Check stored token in localStorage
-  const storedToken = getActiveAccessToken();
-  if (storedToken) return storedToken;
-
-  return null;
+  // 3. Fallback: Return existing token even if expired; backend will return 401 if invalid
+  return existingToken || null;
 };
 
 // ==========================================
@@ -109,7 +159,6 @@ const resolveRequestToken = async () => {
 // ==========================================
 api.interceptors.request.use(
   async (config) => {
-    // If data is FormData, remove manual Content-Type so browser sets boundary correctly
     if (typeof FormData !== "undefined" && config.data instanceof FormData) {
       if (config.headers) {
         if (typeof config.headers.delete === "function") {
@@ -123,20 +172,19 @@ api.interceptors.request.use(
       config.headers["Content-Type"] = "application/json";
     }
 
-    // Skip attaching Authorization header for public /auth/sync if none exists yet
     const url = config.url || "";
     const isAuthSync = url.includes("/auth/sync");
 
     try {
-      const token = await resolveRequestToken();
-      if (token && config.headers) {
-        if (typeof config.headers.set === "function") {
-          config.headers.set("Authorization", `Bearer ${token}`);
+      if (!isAuthSync) {
+        const token = await resolveRequestToken();
+        if (token && config.headers) {
+          if (typeof config.headers.set === "function") {
+            config.headers.set("Authorization", `Bearer ${token}`);
+          }
+          config.headers.Authorization = `Bearer ${token}`;
+          config.headers["Authorization"] = `Bearer ${token}`;
         }
-        config.headers.Authorization = `Bearer ${token}`;
-        config.headers["Authorization"] = `Bearer ${token}`;
-      } else if (!isAuthSync) {
-        // If no token exists and not public sync, still allow proceeding; backend will return 401 if protected
       }
     } catch (err) {
       console.warn("Failed to attach authorization header:", err);
@@ -174,6 +222,8 @@ export const purgeSessionAndRedirect = async (force = false) => {
   }
 
   try {
+    localStorage.removeItem("hinchmart_admin_token");
+    localStorage.removeItem("hinchmart_admin_user");
     localStorage.removeItem("adminToken");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("authToken");
@@ -202,7 +252,7 @@ export const purgeSessionAndRedirect = async (force = false) => {
     isRedirectingToLogin = true;
     setTimeout(() => {
       isRedirectingToLogin = false;
-      window.location.replace("/login");
+      window.location.replace("/login?expired=true");
     }, 300);
   }
 };
@@ -232,7 +282,7 @@ api.interceptors.response.use(
     }
 
     // ----------------------------------------------------
-    // HTTP 401: Unauthorized - Hybrid Token Exchange Silent Refresh
+    // HTTP 401: Unauthorized - Two-Tier Token Exchange Refresh
     // ----------------------------------------------------
     if (status === 401 && originalRequest && !originalRequest._retried) {
       const requestUrl = originalRequest.url || "";
@@ -260,7 +310,6 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Step 1: Retrieve a fresh Firebase ID Token silently from the identity provider session
         let currentUser = auth.currentUser;
         if (!currentUser) {
           currentUser = await waitForFirebaseUser();
@@ -275,50 +324,55 @@ api.interceptors.response.use(
           throw new Error("Unable to obtain fresh Firebase ID token.");
         }
 
-        // Step 2: Call POST /api/auth/sync with the new Firebase ID token
+        // Exchange fresh Firebase ID token for HinchMart JWT accessToken
         const syncUrl = `${apiBaseUrl}/auth/sync`;
-        let newAccessToken = freshFirebaseToken;
-        try {
-          const syncResponse = await axios.post(
-            syncUrl,
-            {
-              firebaseIdToken: freshFirebaseToken,
-              name: currentUser.displayName || undefined,
-              email: currentUser.email || undefined,
-              phone: currentUser.phoneNumber || undefined,
-              role: "ADMIN",
+        const syncResponse = await axios.post(
+          syncUrl,
+          {
+            firebaseIdToken: freshFirebaseToken,
+            role: "ADMIN",
+            email: currentUser.email || undefined,
+            name: currentUser.displayName || undefined,
+            phone: currentUser.phoneNumber || undefined,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${freshFirebaseToken}`,
             },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${freshFirebaseToken}`,
-              },
-              timeout: 15000,
-            }
-          );
+            timeout: 15000,
+          }
+        );
 
-          const responseData = syncResponse.data?.data || syncResponse.data;
-          if (responseData?.accessToken) {
-            newAccessToken = responseData.accessToken;
-          }
-        } catch (syncErr) {
-          console.warn("Silent token sync notice:", syncErr?.message);
-          if (syncErr.response?.status === 401 || syncErr.response?.status === 403) {
-            throw syncErr;
-          }
+        const responseData = syncResponse.data?.data || syncResponse.data;
+        const newAccessToken = responseData?.accessToken || responseData?.token;
+
+        if (!newAccessToken) {
+          throw new Error("Backend did not return an accessToken on /api/auth/sync.");
         }
 
-        // Store new active token
         if (typeof window !== "undefined") {
+          localStorage.setItem("hinchmart_admin_token", newAccessToken);
           localStorage.setItem("adminToken", newAccessToken);
           localStorage.setItem("accessToken", newAccessToken);
           localStorage.setItem("authToken", newAccessToken);
           localStorage.setItem("firebaseToken", freshFirebaseToken);
+          if (responseData) {
+            localStorage.setItem(
+              "hinchmart_admin_user",
+              JSON.stringify({
+                userId: responseData.userId || null,
+                email: responseData.email || currentUser.email,
+                name: responseData.name || currentUser.displayName,
+                role: responseData.role || "ADMIN",
+              })
+            );
+          }
         }
 
         processFailedQueue(null, newAccessToken);
 
-        // Step 3: Retry original failed request with the new token
+        // Retry original failed request with the new HinchMart JWT accessToken
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
@@ -334,6 +388,6 @@ api.interceptors.response.use(
 
     return Promise.reject(error);
   }
-);;
+);
 
 export default api;
