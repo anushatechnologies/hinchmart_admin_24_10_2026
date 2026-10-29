@@ -25,6 +25,7 @@ import {
   formatAuthError,
 } from "../firebase/authService";
 import { useToast } from "../components/ToastContext";
+import logoImg from "../assets/hinchmart-logo.png";
 
 // Admin Department Options
 const ADMIN_DEPARTMENTS = [
@@ -372,8 +373,8 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card" style={{ maxWidth: mode === "register" ? 560 : 460 }}>
         {/* Brand Header */}
-        <div className="login-logo">
-          <ShieldCheck size={32} color="#111827" />
+        <div className="login-brand-header">
+          <img src={logoImg} alt="HinchMart Logo" className="login-brand-logo" />
         </div>
 
         <div className="admin-badge-pill">

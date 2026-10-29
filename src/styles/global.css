@@ -18,18 +18,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-html[data-theme="dark"] body { background: #0b1120; color: #e5e7eb; }
-html[data-theme="dark"] .main-area, html[data-theme="dark"] .page-content { background: #0b1120; }
+html[data-theme="dark"] body { background: #0a0b0e; color: #e5e7eb; }
+html[data-theme="dark"] .main-area, html[data-theme="dark"] .page-content { background: #0a0b0e; }
 html[data-theme="dark"] .page-header h1, html[data-theme="dark"] .settings-section h3, html[data-theme="dark"] .settings-tab:hover, html[data-theme="dark"] .theme-option-label span, html[data-theme="dark"] .appearance-block-title strong { color: #f8fafc; }
 html[data-theme="dark"] .page-header p, html[data-theme="dark"] .text-muted, html[data-theme="dark"] .appearance-block-title span { color: #94a3b8; }
-html[data-theme="dark"] .content-card, html[data-theme="dark"] .settings-tabs, html[data-theme="dark"] .settings-content, html[data-theme="dark"] .appearance-block { background: #111827; border-color: #263247; }
-html[data-theme="dark"] .settings-tab { color: #94a3b8; } html[data-theme="dark"] .settings-tab:hover { background: #1f2937; }
-html[data-theme="dark"] .toggle-item, html[data-theme="dark"] .table-toolbar { background: #172033; border-color: #263247; }
-html[data-theme="dark"] .form-group input, html[data-theme="dark"] .form-group select, html[data-theme="dark"] .form-group textarea, html[data-theme="dark"] input, html[data-theme="dark"] textarea, html[data-theme="dark"] select { background: #172033; border-color: #374151; color: #f8fafc; }
-html[data-theme="dark"] .theme-option-card, html[data-theme="dark"] .accent-options button, html[data-theme="dark"] .density-options button { background: #172033; border-color: #374151; color: #cbd5e1; }
+html[data-theme="dark"] .content-card, html[data-theme="dark"] .settings-tabs, html[data-theme="dark"] .settings-content, html[data-theme="dark"] .appearance-block { background: #12131a; border-color: #232534; }
+html[data-theme="dark"] .settings-tab { color: #94a3b8; } html[data-theme="dark"] .settings-tab:hover { background: #1a1c27; }
+html[data-theme="dark"] .toggle-item, html[data-theme="dark"] .table-toolbar { background: #171823; border-color: #232534; }
+html[data-theme="dark"] .form-group input, html[data-theme="dark"] .form-group select, html[data-theme="dark"] .form-group textarea, html[data-theme="dark"] input, html[data-theme="dark"] textarea, html[data-theme="dark"] select { background: #171823; border-color: #313347; color: #f8fafc; }
+html[data-theme="dark"] .theme-option-card, html[data-theme="dark"] .accent-options button, html[data-theme="dark"] .density-options button { background: #171823; border-color: #313347; color: #cbd5e1; }
 html[data-theme="dark"] .theme-option-card.selected { border-color: #f59e0b; } html[data-theme="dark"] .appearance-live-status { background: #052e1b; border-color: #166534; }
 html[data-accent="emerald"] .primary-button, html[data-accent="emerald"] .settings-tab.active { background: linear-gradient(135deg, #10b981, #047857); color: #fff; }
 html[data-accent="blue"] .primary-button, html[data-accent="blue"] .settings-tab.active { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; }
+html[data-accent="amber"] .primary-button, html[data-accent="amber"] .settings-tab.active { background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827; }
+html[data-accent="amber"] .settings-tab.active { box-shadow: 0 4px 14px rgba(245, 158, 11, .28); }
 html[data-accent="emerald"] .settings-tab.active, html[data-accent="blue"] .settings-tab.active { box-shadow: 0 4px 14px rgba(37, 99, 235, .2); }
 
 button, input, textarea, select {
@@ -137,7 +139,7 @@ a {
 /* LOGIN & REGISTRATION PAGES */
 .login-page {
   min-height: 100vh;
-  background: radial-gradient(circle at 50% 10%, #1e293b, #0a0f1d);
+  background: radial-gradient(circle at 50% 12%, #1b1c24 0%, #0a0b0f 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -154,6 +156,21 @@ a {
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
   border: 1px solid #e2e8f0;
   transition: max-width 0.25s ease;
+}
+
+.login-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.login-brand-logo {
+  height: 84px;
+  width: auto;
+  max-width: 220px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.08));
 }
 
 .login-logo {

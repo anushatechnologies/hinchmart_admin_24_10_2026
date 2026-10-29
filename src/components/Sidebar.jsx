@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthContext";
-import logoImg from "../assets/hinchmart-logo.png";
+import logoImg from "../assets/hinchmart-logo-dark.png";
 import dataStore, { subscribeDataUpdate } from "../api/dataStore";
 import { getBuyers } from "../api/buyerApi";
 import { getSellers } from "../api/sellerApi";

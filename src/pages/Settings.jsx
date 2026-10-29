@@ -519,7 +519,7 @@ export default function Settings() {
                   </div>
                   <div className="accent-options">
                     {[
-                      { id: "amber", color: "#f59e0b", label: "Amber" },
+                      { id: "amber", color: "#f59e0b", label: "HinchMart Gold (Brand)" },
                       { id: "emerald", color: "#10b981", label: "Emerald" },
                       { id: "blue", color: "#3b82f6", label: "Blue" }
                     ].map((accent) => (
