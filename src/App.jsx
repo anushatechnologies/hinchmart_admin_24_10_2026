@@ -37,6 +37,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const VendorStock = lazy(() => import("./pages/VendorStock"));
 const Refunds = lazy(() => import("./pages/Refunds"));
 const CommissionRules = lazy(() => import("./pages/CommissionRules"));
+const Pincodes = lazy(() => import("./pages/Pincodes"));
 
 // Components
 import AdminLayout from "./components/AdminLayout";
@@ -145,6 +146,7 @@ function AppRoutes() {
           <Route path="holding-fees" element={<CommissionRules />} />
           <Route path="shipments" element={<Shipments />} />
           <Route path="shipments/:id" element={<ShipmentDetails />} />
+          <Route path="pincodes" element={<Pincodes />} />
           <Route path="rfqs" element={<RFQs />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
@@ -185,5 +187,4 @@ function App() {
 }
 
 export default App;
-
 

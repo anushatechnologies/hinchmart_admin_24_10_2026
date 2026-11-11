@@ -27,6 +27,7 @@ import {
   Boxes,
   RefreshCw,
   Percent,
+  MapPin,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthContext";
@@ -274,6 +275,7 @@ export default function Sidebar({
             badgeType: "orange",
           },
           { name: "Shipments & Logistics", path: "/admin/shipments", icon: Truck },
+          { name: "Pincode Serviceability", path: "/admin/pincodes", icon: MapPin },
           { name: "Reports & Analytics", path: "/admin/reports", icon: BarChart3 },
           { name: "Settings", path: "/admin/settings", icon: Settings },
         ],
