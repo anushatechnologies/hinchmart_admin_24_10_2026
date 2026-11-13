@@ -96,6 +96,7 @@ export default function Pincodes() {
   const [pincodes, setPincodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isCached, setIsCached] = useState(false);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [page, setPage] = useState(1);
@@ -122,9 +123,11 @@ export default function Pincodes() {
         setPincodes(result.items);
         setTotal(result.total);
         setTotalPages(Math.max(1, result.totalPages));
+        setIsCached(Boolean(payload?.cached));
       } catch (requestError) {
         if (requestError?.name !== "CanceledError" && !controller.signal.aborted) {
           setError(getErrorMessage(requestError, "Unable to load pincodes."));
+          setIsCached(false);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -331,6 +334,13 @@ export default function Pincodes() {
             <button type="button" onClick={() => setRefreshKey((current) => current + 1)}>
               Retry
             </button>
+          </div>
+        )}
+
+        {!error && isCached && (
+          <div className="pincode-offline-notice" role="status">
+            Showing locally cached data — the live pincode database is unreachable, so
+            changes here will not be saved until it is back online.
           </div>
         )}
 

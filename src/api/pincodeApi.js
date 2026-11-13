@@ -122,50 +122,57 @@ export const getAdminPincodes = async (params = {}, config = {}) => {
   return {
     success: true,
     message: "Showing locally cached pincodes (live data unavailable).",
+    cached: true,
     data: items,
     meta,
   };
+};
+
+/**
+ * Raised when a write (create/update/delete) could not be confirmed as
+ * persisted on the server. Callers must NOT treat this as a soft warning --
+ * the change was not saved to the database and the user must be told so.
+ */
+export class PincodeNotPersistedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "PincodeNotPersistedError";
+    this.notPersisted = true;
+  }
+}
+
+const describeWriteFailure = (err, action) => {
+  const status = err?.response?.status;
+  if (status === 404) {
+    return `${action} could not be saved: the admin pincode API is not live on the server yet (404). Nothing was written to the database.`;
+  }
+  return (
+    err?.response?.data?.message ||
+    `${action} failed: ${err?.message || "the server did not confirm the change was saved."}`
+  );
 };
 
 export const createAdminPincode = async (pincode) => {
   try {
     const response = await api.post("/admin/pincodes", pincode);
     const created = unwrapData(response.data);
-    if (created) {
-      const stored = getStoredPincodes();
-      saveStoredPincodes([created, ...stored.filter((p) => p.id !== created.id)]);
-      dispatchDataUpdate("pincodes", "CREATE", created);
+    if (!created) {
+      throw new PincodeNotPersistedError(
+        "The server accepted the request but returned no saved record."
+      );
     }
+    const stored = getStoredPincodes();
+    saveStoredPincodes([created, ...stored.filter((p) => p.id !== created.id)]);
+    dispatchDataUpdate("pincodes", "CREATE", created);
     return created;
   } catch (err) {
+    if (err instanceof PincodeNotPersistedError) throw err;
     if (err?.response?.status === 409) {
       throw new Error(
         err.response?.data?.message || `Pincode ${pincode.pincode} is already registered.`
       );
     }
-    console.warn(
-      "[Pincode API] POST /admin/pincodes notice:",
-      err?.response?.status || err?.message
-    );
-    const stored = getStoredPincodes();
-    if (stored.some((p) => p.pincode === pincode.pincode)) {
-      throw new Error(`Pincode ${pincode.pincode} is already registered.`);
-    }
-    const now = new Date().toISOString();
-    const localPincode = {
-      id: `local_${Date.now()}`,
-      ...pincode,
-      services: (pincode.services || []).map((service, index) => ({
-        id: `local_svc_${Date.now()}_${index}`,
-        ...service,
-        weightSlabs: [],
-      })),
-      createdAt: now,
-      updatedAt: now,
-    };
-    saveStoredPincodes([localPincode, ...stored]);
-    dispatchDataUpdate("pincodes", "CREATE", localPincode);
-    return localPincode;
+    throw new PincodeNotPersistedError(describeWriteFailure(err, "Add pincode"));
   }
 };
 
@@ -180,17 +187,7 @@ export const updateAdminPincode = async (id, pincode) => {
     dispatchDataUpdate("pincodes", "UPDATE", updated);
     return updated;
   } catch (err) {
-    console.warn(
-      `[Pincode API] PUT /admin/pincodes/${id} notice:`,
-      err?.response?.status || err?.message
-    );
-    const stored = getStoredPincodes();
-    const updated = { ...pincode, id, updatedAt: new Date().toISOString() };
-    saveStoredPincodes(
-      stored.map((p) => (String(p.id) === String(id) ? { ...p, ...updated } : p))
-    );
-    dispatchDataUpdate("pincodes", "UPDATE", updated);
-    return updated;
+    throw new PincodeNotPersistedError(describeWriteFailure(err, "Update pincode"));
   }
 };
 
@@ -201,37 +198,22 @@ export const configureAdminPincodeService = async (id, service) => {
       service
     );
     const updated = unwrapData(response.data);
-    if (updated) {
-      const stored = getStoredPincodes();
-      saveStoredPincodes(
-        stored.map((p) => (String(p.id) === String(id) ? { ...p, ...updated } : p))
+    if (!updated) {
+      throw new PincodeNotPersistedError(
+        "The server accepted the request but returned no saved service configuration."
       );
-      dispatchDataUpdate("pincodes", "UPDATE", updated);
     }
-    return updated;
-  } catch (err) {
-    console.warn(
-      `[Pincode API] POST /admin/pincodes/${id}/services notice:`,
-      err?.response?.status || err?.message
-    );
     const stored = getStoredPincodes();
-    const updatedList = stored.map((p) => {
-      if (String(p.id) !== String(id)) return p;
-      const services = Array.isArray(p.services) ? [...p.services] : [];
-      const existingIndex = services.findIndex((s) => s.serviceType === service.serviceType);
-      const mergedService = {
-        id: existingIndex >= 0 ? services[existingIndex].id : `local_svc_${Date.now()}`,
-        weightSlabs: existingIndex >= 0 ? services[existingIndex].weightSlabs || [] : [],
-        ...service,
-      };
-      if (existingIndex >= 0) services[existingIndex] = mergedService;
-      else services.push(mergedService);
-      return { ...p, services, updatedAt: new Date().toISOString() };
-    });
-    saveStoredPincodes(updatedList);
-    const updated = updatedList.find((p) => String(p.id) === String(id));
+    saveStoredPincodes(
+      stored.map((p) => (String(p.id) === String(id) ? { ...p, ...updated } : p))
+    );
     dispatchDataUpdate("pincodes", "UPDATE", updated);
     return updated;
+  } catch (err) {
+    if (err instanceof PincodeNotPersistedError) throw err;
+    throw new PincodeNotPersistedError(
+      describeWriteFailure(err, `Save ${service.serviceType} availability`)
+    );
   }
 };
 
@@ -243,14 +225,7 @@ export const deleteAdminPincode = async (id) => {
     dispatchDataUpdate("pincodes", "DELETE", { id });
     return response.data;
   } catch (err) {
-    console.warn(
-      `[Pincode API] DELETE /admin/pincodes/${id} notice:`,
-      err?.response?.status || err?.message
-    );
-    const stored = getStoredPincodes();
-    saveStoredPincodes(stored.filter((p) => String(p.id) !== String(id)));
-    dispatchDataUpdate("pincodes", "DELETE", { id });
-    return { success: true, message: "Deleted from local cache (live backend unavailable)." };
+    throw new PincodeNotPersistedError(describeWriteFailure(err, "Delete pincode"));
   }
 };
 
@@ -268,16 +243,7 @@ export const bulkUpdatePincodeStatus = async (pincodes, active) => {
     dispatchDataUpdate("pincodes", "BULK_STATUS", { pincodes, active });
     return result;
   } catch (err) {
-    console.warn(
-      "[Pincode API] PATCH /admin/pincodes/bulk-status notice:",
-      err?.response?.status || err?.message
-    );
-    const stored = getStoredPincodes();
-    saveStoredPincodes(
-      stored.map((p) => (pincodes.includes(p.pincode) ? { ...p, active } : p))
-    );
-    dispatchDataUpdate("pincodes", "BULK_STATUS", { pincodes, active });
-    return pincodes.length;
+    throw new PincodeNotPersistedError(describeWriteFailure(err, "Bulk status update"));
   }
 };
 
