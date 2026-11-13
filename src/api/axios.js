@@ -8,9 +8,25 @@ import { auth } from "../firebase/firebaseConfig";
 // so a direct browser connection fails outright with ERR_FAILED/CORS errors.
 // Routing through "/api" keeps every request same-origin from the browser's
 // point of view; the actual cross-origin hop happens server-side instead,
-// where CORS does not apply -- via the Vite dev proxy (vite.config.js) locally
-// and the Vercel rewrite (vercel.json) in production.
+// where CORS does not apply.
+//
+// Locally, the Vite dev-server proxy (vite.config.js) forwards "/api/*"
+// straight to the backend. In production, that same path shape isn't used --
+// Vercel's dynamic catch-all function (api/[...path].js) is never invoked
+// when deployed from this Windows machine (a plain fixed-name function
+// works fine; only the bracket-named catch-all route silently fails to
+// match, pointing to a path-separator bug in the CLI's route-pattern
+// generation). Production instead calls a fixed-name proxy function,
+// api/proxy.js, passing the real backend path as a query parameter.
+const useQueryProxy = import.meta.env.PROD;
+
 export const apiBaseUrl = "/api";
+
+/** Builds the URL used to reach a given backend path ("admin/pincodes", "auth/sync", ...). */
+export const buildApiUrl = (path) => {
+  const cleanPath = String(path).replace(/^\/+/, "");
+  return useQueryProxy ? `/api/proxy?__hm_path=${encodeURIComponent(cleanPath)}` : `/api/${cleanPath}`;
+};
 
 const api = axios.create({
   baseURL: apiBaseUrl,
@@ -101,7 +117,7 @@ const resolveRequestToken = async () => {
         localStorage.setItem("firebaseToken", freshFirebaseToken);
       }
 
-      const syncUrl = `${apiBaseUrl}/auth/sync`;
+      const syncUrl = buildApiUrl("auth/sync");
       const syncResponse = await axios.post(
         syncUrl,
         {
@@ -183,6 +199,12 @@ api.interceptors.request.use(
       }
     } catch (err) {
       console.warn("Failed to attach authorization header:", err);
+    }
+
+    if (useQueryProxy) {
+      const cleanPath = (config.url || "").replace(/^\/+/, "");
+      config.params = { ...(config.params || {}), __hm_path: cleanPath };
+      config.url = "/proxy";
     }
 
     return config;
@@ -320,7 +342,7 @@ api.interceptors.response.use(
         }
 
         // Exchange fresh Firebase ID token for HinchMart JWT accessToken
-        const syncUrl = `${apiBaseUrl}/auth/sync`;
+        const syncUrl = buildApiUrl("auth/sync");
         const syncResponse = await axios.post(
           syncUrl,
           {

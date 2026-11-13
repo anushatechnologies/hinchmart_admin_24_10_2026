@@ -1,13 +1,21 @@
-// Reverse proxy for /api/* -> https://api.hinchmart.com/api/*.
+// Reverse proxy for backend calls, addressed as /api/proxy?__hm_path=<path>.
 //
-// A plain Vercel `rewrites` entry forwards the client's Origin/Referer
-// headers unchanged, and the backend's CORS filter rejects ANY Origin header
-// it doesn't recognize -- even on this same-origin-from-the-browser, proxied
-// hop -- with "Invalid CORS request" (403). Browsers send Origin on
-// same-origin POST/PUT/PATCH/DELETE requests too, so that 403 reaches the
-// app. Proxying through a function instead lets us drop those headers
-// before forwarding, so the backend sees a plain, origin-less server-to-
-// server request.
+// A dynamic catch-all function (api/[...path].js) is NOT invoked at all when
+// deployed from this Windows machine via the Vercel CLI -- a plain fixed-name
+// function (api/ping.js) works, but the bracket-named catch-all route never
+// gets matched, which points to a Windows path-separator bug in how the CLI
+// computes the route pattern for bracket filenames. Using a fixed filename
+// with the real backend path passed as a query parameter sidesteps that
+// entirely.
+//
+// Separately: a plain Vercel `rewrites` entry forwards the client's
+// Origin/Referer headers unchanged, and the backend's CORS filter rejects
+// ANY Origin header it doesn't recognize -- even on this same-origin-from-
+// the-browser, proxied hop -- with "Invalid CORS request" (403). Browsers
+// send Origin on same-origin POST/PUT/PATCH/DELETE requests too, so real
+// traffic would hit that 403. Proxying through a function lets us drop
+// those headers before forwarding, so the backend sees a plain, origin-less
+// server-to-server request.
 const BACKEND_BASE = "https://api.hinchmart.com";
 const DROPPED_REQUEST_HEADERS = new Set([
   "host",
@@ -33,9 +41,9 @@ export const config = {
 
 export default async function handler(req, res) {
   try {
-    const { path, ...queryParams } = req.query;
-    const segments = Array.isArray(path) ? path : path ? [path] : [];
-    const url = new URL(`${BACKEND_BASE}/api/${segments.join("/")}`);
+    const { __hm_path, ...queryParams } = req.query;
+    const path = Array.isArray(__hm_path) ? __hm_path.join("/") : __hm_path || "";
+    const url = new URL(`${BACKEND_BASE}/api/${path}`);
 
     for (const [key, value] of Object.entries(queryParams)) {
       if (Array.isArray(value)) {
