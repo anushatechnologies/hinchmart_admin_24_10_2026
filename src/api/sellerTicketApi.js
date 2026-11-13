@@ -1,6 +1,28 @@
 import api from "./axios";
 
 const STORAGE_KEY_SELLER_TICKETS = "hinchmart_seller_tickets_cache_v2";
+const STORAGE_KEY_SELLER_TICKETS_COOLDOWN = "hinchmart_seller_tickets_cooldown_v1";
+
+// If every candidate endpoint fails (e.g. none deployed yet), avoid re-probing
+// all of them on every call -- go straight to cache until the cooldown lapses.
+// Persisted to localStorage so it survives page reloads, not just this tab session.
+const ENDPOINT_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
+
+const getSellerTicketsCooldownUntil = () => {
+  if (typeof window === "undefined") return 0;
+  try {
+    return Number(localStorage.getItem(STORAGE_KEY_SELLER_TICKETS_COOLDOWN)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
+const setSellerTicketsCooldownUntil = (timestamp) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_SELLER_TICKETS_COOLDOWN, String(timestamp));
+  } catch {}
+};
 
 /**
  * Local cache helpers for resilient offline/cold fallback
@@ -140,33 +162,36 @@ export const getAdminSellerTickets = async (params = {}) => {
     "/tickets",
   ];
 
-  for (const ep of candidateEndpoints) {
-    try {
-      const response = await api.get(ep, { params: cleanParams });
-      const rawList = extractDataList(response.data);
-      const normalized = rawList.map(normalizeTicket);
-      const pagination = extractPagination(
-        response.data,
-        normalized.length,
-        cleanParams.page || 1,
-        cleanParams.limit || 20
-      );
+  if (Date.now() >= getSellerTicketsCooldownUntil()) {
+    for (const ep of candidateEndpoints) {
+      try {
+        const response = await api.get(ep, { params: cleanParams });
+        const rawList = extractDataList(response.data);
+        const normalized = rawList.map(normalizeTicket);
+        const pagination = extractPagination(
+          response.data,
+          normalized.length,
+          cleanParams.page || 1,
+          cleanParams.limit || 20
+        );
 
-      // Save to local cache
-      saveStoredTickets(normalized);
+        // Save to local cache
+        saveStoredTickets(normalized);
 
-      return {
-        data: normalized,
-        pagination,
-        raw: response.data,
-      };
-    } catch (err) {
-      if (err?.response?.status === 401) {
-        break; // Stop immediately on auth failure
+        return {
+          data: normalized,
+          pagination,
+          raw: response.data,
+        };
+      } catch (err) {
+        if (err?.response?.status === 401) {
+          break; // Stop immediately on auth failure
+        }
+        console.warn(`[Seller Tickets API] Notice on ${ep}:`, err?.response?.status || err?.message);
+        continue;
       }
-      console.warn(`[Seller Tickets API] Notice on ${ep}:`, err?.response?.status || err?.message);
-      continue;
     }
+    setSellerTicketsCooldownUntil(Date.now() + ENDPOINT_FAILURE_COOLDOWN_MS);
   }
 
   // Graceful fallback to local tickets cache if endpoints are not yet deployed

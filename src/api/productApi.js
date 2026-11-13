@@ -57,7 +57,7 @@ export const isBlockedDummyProduct = (p) => {
     title === "power tools power tools"
   ) {
     const id = p.productId || p.id;
-    if (id) {
+    if (id && !getDeletedProductIds().has(String(id))) {
       markProductDeleted(id);
       try {
         api.delete(`/admin/products/${id}`).catch(() => {});

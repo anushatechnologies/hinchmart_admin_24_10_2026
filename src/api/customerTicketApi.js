@@ -1,6 +1,28 @@
 import api from "./axios";
 
 const STORAGE_KEY_CUSTOMER_TICKETS = "hinchmart_customer_tickets_cache_v2";
+const STORAGE_KEY_CUSTOMER_TICKETS_COOLDOWN = "hinchmart_customer_tickets_cooldown_v1";
+
+// If every candidate endpoint fails (e.g. none deployed yet), avoid re-probing
+// all of them on every call -- go straight to cache until the cooldown lapses.
+// Persisted to localStorage so it survives page reloads, not just this tab session.
+const ENDPOINT_FAILURE_COOLDOWN_MS = 30 * 60 * 1000;
+
+const getCustomerTicketsCooldownUntil = () => {
+  if (typeof window === "undefined") return 0;
+  try {
+    return Number(localStorage.getItem(STORAGE_KEY_CUSTOMER_TICKETS_COOLDOWN)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
+const setCustomerTicketsCooldownUntil = (timestamp) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOMER_TICKETS_COOLDOWN, String(timestamp));
+  } catch {}
+};
 
 /**
  * Local cache helpers for customer tickets
@@ -263,36 +285,39 @@ export const getAdminCustomerTickets = async (params = {}) => {
     { ep: "/tickets", params: { ...cleanParams, userType: "CUSTOMER" } },
   ];
 
-  for (const { ep, params: epParams } of candidateEndpoints) {
-    try {
-      const response = await api.get(ep, { params: epParams });
-      const rawList = extractDataList(response.data);
-      // Filter out any seller-specific tickets if returned from unified endpoint
-      const filteredRaw = rawList.filter((item) => {
-        const uType = (item.userType || item.targetType || "").toUpperCase();
-        return uType !== "SELLER";
-      });
+  if (Date.now() >= getCustomerTicketsCooldownUntil()) {
+    for (const { ep, params: epParams } of candidateEndpoints) {
+      try {
+        const response = await api.get(ep, { params: epParams });
+        const rawList = extractDataList(response.data);
+        // Filter out any seller-specific tickets if returned from unified endpoint
+        const filteredRaw = rawList.filter((item) => {
+          const uType = (item.userType || item.targetType || "").toUpperCase();
+          return uType !== "SELLER";
+        });
 
-      const normalized = filteredRaw.map(normalizeCustomerTicket);
-      const pagination = extractPagination(
-        response.data,
-        normalized.length,
-        cleanParams.page || 1,
-        cleanParams.limit || 20
-      );
+        const normalized = filteredRaw.map(normalizeCustomerTicket);
+        const pagination = extractPagination(
+          response.data,
+          normalized.length,
+          cleanParams.page || 1,
+          cleanParams.limit || 20
+        );
 
-      // Save to cache
-      saveStoredCustomerTickets(normalized);
+        // Save to cache
+        saveStoredCustomerTickets(normalized);
 
-      return {
-        data: normalized,
-        pagination,
-        raw: response.data,
-      };
-    } catch (err) {
-      if (err?.response?.status === 401) break;
-      continue;
+        return {
+          data: normalized,
+          pagination,
+          raw: response.data,
+        };
+      } catch (err) {
+        if (err?.response?.status === 401) break;
+        continue;
+      }
     }
+    setCustomerTicketsCooldownUntil(Date.now() + ENDPOINT_FAILURE_COOLDOWN_MS);
   }
 
   // Fallback to local cache
