@@ -2,20 +2,15 @@ import axios from "axios";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebaseConfig";
 
-const configuredBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  "https://api.hinchmart.com";
-
-// If an absolute URL is provided (e.g. https://api.hinchmart.com or http://localhost:8080),
-// connect directly from the browser to avoid Node.js dev-proxy TLS renegotiation / ECONNRESET errors.
-const isExplicitProxy =
-  typeof configuredBaseUrl === "string" &&
-  (configuredBaseUrl.startsWith("/") || configuredBaseUrl === "");
-
-export const apiBaseUrl = isExplicitProxy
-  ? configuredBaseUrl || "/api"
-  : `${configuredBaseUrl.replace(/\/+$/, "").replace(/\/api$/, "")}/api`;
+// Always call the API through a same-origin "/api" path instead of connecting
+// directly from the browser to the backend's absolute URL. The backend's CORS
+// configuration rejects every Origin (including previously-whitelisted ones),
+// so a direct browser connection fails outright with ERR_FAILED/CORS errors.
+// Routing through "/api" keeps every request same-origin from the browser's
+// point of view; the actual cross-origin hop happens server-side instead,
+// where CORS does not apply -- via the Vite dev proxy (vite.config.js) locally
+// and the Vercel rewrite (vercel.json) in production.
+export const apiBaseUrl = "/api";
 
 const api = axios.create({
   baseURL: apiBaseUrl,
