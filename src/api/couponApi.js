@@ -26,6 +26,13 @@ export const saveStoredCoupons = (coupons) => {
   }
 };
 
+// The admin UI's internal field names (isActive, totalUsageLimit, expiryDate,
+// discountType "FIXED_AMOUNT") differ from the backend's wire format (active,
+// usageLimit, endDate, discountType "FLAT"). Translate at the API boundary
+// instead of renaming throughout the UI.
+const UI_TO_WIRE_DISCOUNT_TYPE = { FIXED_AMOUNT: "FLAT", PERCENTAGE: "PERCENTAGE" };
+const WIRE_TO_UI_DISCOUNT_TYPE = { FLAT: "FIXED_AMOUNT", PERCENTAGE: "PERCENTAGE" };
+
 /**
  * Normalizes coupon payload to adhere strictly to backend validation rules:
  * 1. maxDiscountAmount must NOT be present when discountType is FIXED_AMOUNT
@@ -33,19 +40,19 @@ export const saveStoredCoupons = (coupons) => {
  * 3. numbers are properly parsed
  */
 export const sanitizeCouponPayload = (formData = {}) => {
-  const discountType = (formData.discountType || "PERCENTAGE").toUpperCase();
-  const isPercentage = discountType === "PERCENTAGE";
+  const uiDiscountType = (formData.discountType || "PERCENTAGE").toUpperCase();
+  const isPercentage = uiDiscountType === "PERCENTAGE";
 
   const payload = {
     code: String(formData.code || "").trim().toUpperCase(),
     title: String(formData.title || "").trim(),
     description: formData.description ? String(formData.description).trim() : undefined,
-    discountType,
+    discountType: UI_TO_WIRE_DISCOUNT_TYPE[uiDiscountType] || uiDiscountType,
     discountValue: Number(formData.discountValue || 0),
     minOrderAmount: formData.minOrderAmount !== undefined && formData.minOrderAmount !== "" ? Number(formData.minOrderAmount) : 0,
     perUserLimit: formData.perUserLimit !== undefined && formData.perUserLimit !== "" ? Number(formData.perUserLimit) : 1,
     firstOrderOnly: Boolean(formData.firstOrderOnly),
-    isActive: formData.isActive !== undefined ? Boolean(formData.isActive) : true,
+    active: formData.isActive !== undefined ? Boolean(formData.isActive) : true,
   };
 
   // Rule: maxDiscountAmount must ONLY be sent for PERCENTAGE type
@@ -53,9 +60,9 @@ export const sanitizeCouponPayload = (formData = {}) => {
     payload.maxDiscountAmount = Number(formData.maxDiscountAmount);
   }
 
-  // totalUsageLimit
+  // usageLimit
   if (formData.totalUsageLimit !== undefined && formData.totalUsageLimit !== "" && Number(formData.totalUsageLimit) > 0) {
-    payload.totalUsageLimit = Number(formData.totalUsageLimit);
+    payload.usageLimit = Number(formData.totalUsageLimit);
   }
 
   // Dates in ISO 8601
@@ -63,10 +70,26 @@ export const sanitizeCouponPayload = (formData = {}) => {
     payload.startDate = new Date(formData.startDate).toISOString();
   }
   if (formData.expiryDate) {
-    payload.expiryDate = new Date(formData.expiryDate).toISOString();
+    payload.endDate = new Date(formData.expiryDate).toISOString();
   }
 
   return payload;
+};
+
+/**
+ * Normalizes a coupon object returned by the backend back into the UI's
+ * internal field names (reverse of sanitizeCouponPayload's wire mapping).
+ */
+export const normalizeCouponResponse = (coupon) => {
+  if (!coupon || typeof coupon !== "object") return coupon;
+  const wireDiscountType = (coupon.discountType || "").toUpperCase();
+  return {
+    ...coupon,
+    discountType: WIRE_TO_UI_DISCOUNT_TYPE[wireDiscountType] || coupon.discountType,
+    isActive: coupon.active !== undefined ? Boolean(coupon.active) : coupon.isActive !== false,
+    totalUsageLimit: coupon.usageLimit !== undefined ? coupon.usageLimit : coupon.totalUsageLimit,
+    expiryDate: coupon.endDate !== undefined ? coupon.endDate : coupon.expiryDate,
+  };
 };
 
 /**
@@ -96,16 +119,16 @@ export const createCoupon = async (couponData) => {
   if (payload.discountType === "PERCENTAGE" && (payload.discountValue <= 0 || payload.discountValue > 100)) {
     throw new Error("Percentage discount must be between 1% and 100%");
   }
-  if (payload.discountType === "FIXED_AMOUNT" && payload.discountValue <= 0) {
+  if (payload.discountType === "FLAT" && payload.discountValue <= 0) {
     throw new Error("Fixed discount amount must be greater than 0");
   }
-  if (payload.startDate && payload.expiryDate && new Date(payload.expiryDate) <= new Date(payload.startDate)) {
+  if (payload.startDate && payload.endDate && new Date(payload.endDate) <= new Date(payload.startDate)) {
     throw new Error("Expiry date must be after start date");
   }
 
   try {
     const res = await api.post("/admin/coupons", payload);
-    const created = res.data?.data || res.data?.coupon || res.data;
+    const created = normalizeCouponResponse(res.data?.data || res.data?.coupon || res.data);
     if (created) {
       const stored = getStoredCoupons();
       saveStoredCoupons([created, ...stored.filter((c) => c.id !== created.id)]);
@@ -136,7 +159,7 @@ export const getCoupons = async (params = {}) => {
 
   try {
     const res = await api.get("/admin/coupons", { params: queryParams });
-    const content = extractList(res);
+    const content = extractList(res).map(normalizeCouponResponse);
     const meta = {
       totalElements: res.data?.data?.totalElements ?? res.data?.totalElements ?? content.length,
       totalPages: res.data?.data?.totalPages ?? res.data?.totalPages ?? 1,
@@ -162,7 +185,7 @@ export const getCoupons = async (params = {}) => {
 export const getCouponById = async (id) => {
   try {
     const res = await api.get(`/admin/coupons/${id}`);
-    return res.data?.data || res.data?.coupon || res.data;
+    return normalizeCouponResponse(res.data?.data || res.data?.coupon || res.data);
   } catch (err) {
     console.warn(`Backend GET /admin/coupons/${id} notice:`, err?.message);
     const cached = getStoredCoupons();
@@ -179,7 +202,7 @@ export const updateCoupon = async (id, couponData) => {
 
   try {
     const res = await api.put(`/admin/coupons/${id}`, payload);
-    const updated = res.data?.data || res.data?.coupon || res.data || { id, ...payload };
+    const updated = normalizeCouponResponse(res.data?.data || res.data?.coupon || res.data || { id, ...payload });
     const stored = getStoredCoupons();
     saveStoredCoupons(stored.map((c) => (String(c.id) === String(id) ? { ...c, ...updated } : c)));
     dispatchDataUpdate("coupons", "UPDATE", updated);
@@ -201,10 +224,10 @@ export const toggleCouponStatus = async (id, activeStatus) => {
   try {
     const res = await api.patch(
       `/admin/coupons/${id}/status`,
-      { isActive },
+      { active: isActive },
       { params: { active: isActive } }
     );
-    const updated = res.data?.data || res.data || { id, isActive };
+    const updated = normalizeCouponResponse(res.data?.data || res.data || { id, active: isActive });
     const stored = getStoredCoupons();
     saveStoredCoupons(stored.map((c) => (String(c.id) === String(id) ? { ...c, isActive } : c)));
     dispatchDataUpdate("coupons", "STATUS_CHANGE", { id, isActive });

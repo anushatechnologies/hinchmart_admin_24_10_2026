@@ -612,10 +612,7 @@ export const approveSellerAccount = async (sellerId, { action = "APPROVE", notes
     ? `/admin/sellers/${sellerId}/approve`
     : `/admin/sellers/${sellerId}/reject`;
 
-  const payload = {
-    remarks,
-    verified: isApprove,
-  };
+  const payload = isApprove ? { approved: true, remarks } : { remarks };
   let backendResponse = null;
 
   try {

@@ -229,18 +229,19 @@ export const deleteAdminPincode = async (id) => {
   }
 };
 
-export const bulkUpdatePincodeStatus = async (pincodes, active) => {
+export const bulkUpdatePincodeStatus = async (pincodeIds, active, reason) => {
   try {
     const response = await api.patch("/admin/pincodes/bulk-status", {
-      pincodes,
+      pincodeIds,
       active,
+      ...(reason ? { reason } : {}),
     });
     const result = unwrapData(response.data);
     const stored = getStoredPincodes();
     saveStoredPincodes(
-      stored.map((p) => (pincodes.includes(p.pincode) ? { ...p, active } : p))
+      stored.map((p) => (pincodeIds.includes(p.id) ? { ...p, active } : p))
     );
-    dispatchDataUpdate("pincodes", "BULK_STATUS", { pincodes, active });
+    dispatchDataUpdate("pincodes", "BULK_STATUS", { pincodeIds, active, reason });
     return result;
   } catch (err) {
     throw new PincodeNotPersistedError(describeWriteFailure(err, "Bulk status update"));
@@ -251,6 +252,9 @@ export const bulkUpdatePincodeStatus = async (pincodes, active) => {
 // Weight Pricing Slabs
 // ==========================================
 
+/**
+ * slab: { minWeightKg, maxWeightKg, basePrice, pricePerKg }
+ */
 export const addWeightSlab = async (serviceId, slab) => {
   const response = await api.post(
     `/admin/pincode-services/${encodeURIComponent(serviceId)}/slabs`,
@@ -259,6 +263,9 @@ export const addWeightSlab = async (serviceId, slab) => {
   return unwrapData(response.data);
 };
 
+/**
+ * slab: { minWeightKg, maxWeightKg, basePrice, pricePerKg }
+ */
 export const updateWeightSlab = async (slabId, slab) => {
   const response = await api.put(
     `/admin/pincode-services/slabs/${encodeURIComponent(slabId)}`,
