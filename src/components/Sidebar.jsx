@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Percent,
   MapPin,
+  Route,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthContext";
@@ -276,6 +277,7 @@ export default function Sidebar({
           },
           { name: "Shipments & Logistics", path: "/admin/shipments", icon: Truck },
           { name: "Pincode Serviceability", path: "/admin/pincodes", icon: MapPin },
+          { name: "Delivery Pricing", path: "/admin/delivery-pricing", icon: Route },
           { name: "Reports & Analytics", path: "/admin/reports", icon: BarChart3 },
           { name: "Settings", path: "/admin/settings", icon: Settings },
         ],

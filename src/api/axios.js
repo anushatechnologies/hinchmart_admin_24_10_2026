@@ -39,13 +39,18 @@ const api = axios.create({
  */
 export const getActiveAccessToken = () => {
   if (typeof window === "undefined") return null;
-  return (
-    localStorage.getItem("hinchmart_admin_token") ||
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("authToken") ||
-    null
-  );
+  // Compatibility and primary keys may contain a legacy Firebase token.
+  // Never send Firebase tokens to backend-protected admin endpoints.
+  for (const key of ["hinchmart_admin_token", "adminToken", "accessToken", "authToken"]) {
+    const candidate = localStorage.getItem(key);
+    if (!candidate) continue;
+    try {
+      const payload = JSON.parse(atob(candidate.split(".")[1].replace(/-/g, "+").replace(/\//g, "/")));
+      if (payload.iss?.startsWith("https://securetoken.google.com/")) continue;
+    } catch {}
+    return candidate;
+  }
+  return null;
 };
 
 /**

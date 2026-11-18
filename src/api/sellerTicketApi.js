@@ -154,12 +154,8 @@ export const getAdminSellerTickets = async (params = {}) => {
 
   // Exact endpoints per the Seller Support Tickets API Specification and aliases
   const candidateEndpoints = [
-    "/admin/seller-support/tickets",
+    "/admin/sellers/tickets",
     "/admin/seller/help/tickets",
-    "/seller/help/tickets",
-    "/admin/tickets",
-    "/support/tickets",
-    "/tickets",
   ];
 
   if (Date.now() >= getSellerTicketsCooldownUntil()) {
@@ -227,12 +223,8 @@ export const getAdminSellerTickets = async (params = {}) => {
  */
 export const getAdminSellerTicketById = async (id) => {
   const candidateEndpoints = [
-    `/admin/seller-support/tickets/${id}`,
+    `/admin/sellers/tickets/${id}`,
     `/admin/seller/help/tickets/${id}`,
-    `/seller/help/tickets/${id}`,
-    `/admin/tickets/${id}`,
-    `/support/tickets/${id}`,
-    `/tickets/${id}`,
   ];
 
   for (const ep of candidateEndpoints) {
@@ -286,18 +278,8 @@ export const replyToSellerTicket = async (id, { content, attachmentUrl = null })
   };
 
   const candidateEndpoints = [
-    `/admin/seller-support/tickets/${id}/messages`,
+    `/admin/sellers/tickets/${id}/messages`,
     `/admin/seller/help/tickets/${id}/messages`,
-    `/admin/seller-tickets/${id}/messages`,
-    `/admin/seller/tickets/${id}/messages`,
-    `/seller/help/tickets/${id}/messages`,
-    `/seller-tickets/${id}/messages`,
-    `/admin/seller/help/tickets/${id}/reply`,
-    `/admin/seller-tickets/${id}/reply`,
-    `/admin/tickets/${id}/messages`,
-    `/admin/tickets/${id}/reply`,
-    `/support/tickets/${id}/messages`,
-    `/tickets/${id}/messages`,
   ];
 
   let rawMessage = null;
@@ -357,12 +339,8 @@ export const updateSellerTicketStatus = async (id, { status, priority = null }) 
   }
 
   const candidateAttempts = [
-    { method: "put", ep: `/admin/seller-support/tickets/${id}/status` },
-    { method: "patch", ep: `/admin/seller-support/tickets/${id}/status` },
+    { method: "patch", ep: `/admin/sellers/tickets/${id}/status` },
     { method: "patch", ep: `/admin/seller/help/tickets/${id}/status` },
-    { method: "put", ep: `/admin/seller/help/tickets/${id}/status` },
-    { method: "patch", ep: `/seller/help/tickets/${id}/status` },
-    { method: "put", ep: `/seller/help/tickets/${id}/status` },
   ];
 
   let updatedTicket = null;

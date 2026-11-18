@@ -268,21 +268,12 @@ export const getAdminCustomerTickets = async (params = {}) => {
   }
 
   const candidateEndpoints = [
-    { ep: "/admin/support/tickets", params: cleanParams },
     { ep: "/admin/help/tickets", params: cleanParams },
-    { ep: "/help/tickets", params: cleanParams },
-    { ep: "/admin/customer/tickets", params: cleanParams },
-    { ep: "/admin/customer-tickets", params: cleanParams },
     { ep: "/admin/customer/help/tickets", params: cleanParams },
+    { ep: "/admin/customers/tickets", params: cleanParams },
+    { ep: "/admin/tickets", params: cleanParams },
+    { ep: "/help/tickets", params: cleanParams },
     { ep: "/customer/help/tickets", params: cleanParams },
-    { ep: "/customer/tickets", params: cleanParams },
-    { ep: "/customer-tickets", params: cleanParams },
-    { ep: "/admin/support/customer/tickets", params: cleanParams },
-    { ep: "/admin/support/customer-tickets", params: cleanParams },
-    { ep: "/admin/tickets", params: { ...cleanParams, targetType: "CUSTOMER" } },
-    { ep: "/admin/tickets", params: { ...cleanParams, userType: "CUSTOMER" } },
-    { ep: "/support/tickets", params: { ...cleanParams, userType: "CUSTOMER" } },
-    { ep: "/tickets", params: { ...cleanParams, userType: "CUSTOMER" } },
   ];
 
   if (Date.now() >= getCustomerTicketsCooldownUntil()) {
@@ -355,20 +346,10 @@ export const getAdminCustomerTickets = async (params = {}) => {
  */
 export const getAdminCustomerTicketById = async (id) => {
   const candidateEndpoints = [
-    `/admin/support/tickets/${id}`,
     `/admin/help/tickets/${id}`,
-    `/help/tickets/${id}`,
-    `/admin/customer/tickets/${id}`,
-    `/admin/customer-tickets/${id}`,
     `/admin/customer/help/tickets/${id}`,
-    `/customer/help/tickets/${id}`,
-    `/customer/tickets/${id}`,
-    `/customer-tickets/${id}`,
-    `/admin/support/customer/tickets/${id}`,
-    `/admin/support/customer-tickets/${id}`,
+    `/admin/customers/tickets/${id}`,
     `/admin/tickets/${id}`,
-    `/support/tickets/${id}`,
-    `/tickets/${id}`,
   ];
 
   for (const ep of candidateEndpoints) {
@@ -422,20 +403,10 @@ export const replyToCustomerTicket = async (id, { content, attachmentUrl = null 
   };
 
   const candidateEndpoints = [
-    `/admin/support/tickets/${id}/messages`,
-    `/help/tickets/${id}/messages`,
     `/admin/help/tickets/${id}/messages`,
-    `/admin/customer/tickets/${id}/messages`,
-    `/admin/customer-tickets/${id}/messages`,
     `/admin/customer/help/tickets/${id}/messages`,
-    `/customer/help/tickets/${id}/messages`,
-    `/customer/tickets/${id}/messages`,
-    `/customer-tickets/${id}/messages`,
-    `/admin/customer/tickets/${id}/reply`,
-    `/admin/customer-tickets/${id}/reply`,
+    `/admin/customers/tickets/${id}/messages`,
     `/admin/tickets/${id}/messages`,
-    `/support/tickets/${id}/messages`,
-    `/tickets/${id}/messages`,
   ];
 
   let rawMessage = null;
@@ -493,16 +464,10 @@ export const updateCustomerTicketStatus = async (id, { status, priority = null }
   }
 
   const candidateAttempts = [
-    { method: "put", ep: `/admin/support/tickets/${id}/status` },
     { method: "patch", ep: `/admin/help/tickets/${id}/status` },
-    { method: "patch", ep: `/help/tickets/${id}/status` },
-    { method: "put", ep: `/help/tickets/${id}` },
-    { method: "patch", ep: `/admin/customer/tickets/${id}/status` },
-    { method: "put", ep: `/admin/customer/tickets/${id}/status` },
     { method: "patch", ep: `/admin/customer/help/tickets/${id}/status` },
-    { method: "patch", ep: `/customer/help/tickets/${id}/status` },
+    { method: "patch", ep: `/admin/customers/tickets/${id}/status` },
     { method: "patch", ep: `/admin/tickets/${id}/status` },
-    { method: "put", ep: `/admin/tickets/${id}/status` },
   ];
 
   let updatedTicket = null;

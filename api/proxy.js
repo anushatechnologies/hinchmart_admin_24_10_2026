@@ -16,7 +16,14 @@
 // traffic would hit that 403. Proxying through a function lets us drop
 // those headers before forwarding, so the backend sees a plain, origin-less
 // server-to-server request.
-const BACKEND_BASE = "https://api.hinchmart.com";
+const BACKEND_BASE = (
+  process.env.HINCHMART_API_BASE_URL ||
+  process.env.VITE_API_BASE_URL ||
+  process.env.VITE_API_URL ||
+  "https://api.hinchmart.com"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 const DROPPED_REQUEST_HEADERS = new Set([
   "host",
   "origin",

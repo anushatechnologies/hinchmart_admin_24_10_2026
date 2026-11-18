@@ -20,6 +20,14 @@ import { auth } from "./firebaseConfig";
  */
 export const formatAuthError = (error) => {
   if (!error) return "An unexpected error occurred.";
+  const responseMessage =
+    error?.response?.data?.message ||
+    error?.data?.message ||
+    error?.message;
+  const status = error?.response?.status || error?.status;
+  if (status === 403 || responseMessage?.toLowerCase().includes("forbidden")) {
+    return `Admin authorization denied: ${responseMessage || "The account does not have administrative privileges."}`;
+  }
   const code = error.code || "";
   switch (code) {
     case "auth/popup-closed-by-user":
@@ -182,7 +190,7 @@ export const verifyPhoneOtp = async (confirmationResult, otpCode, displayName = 
   }
 
   const firebaseToken = await user.getIdToken(true);
-  let activeToken = firebaseToken;
+  let activeToken = null;
   let backendData = null;
 
   try {
@@ -197,9 +205,15 @@ export const verifyPhoneOtp = async (confirmationResult, otpCode, displayName = 
     backendData = syncRes?.data || syncRes;
     if (backendData?.accessToken) {
       activeToken = backendData.accessToken;
+    } else {
+      throw new Error("Backend authentication did not return an accessToken.");
     }
   } catch (syncErr) {
-    console.warn("Backend auth/sync notice:", syncErr?.message);
+    throw syncErr?.response?.data
+      ? Object.assign(new Error(syncErr.response.data.message || "Backend authorization failed."), {
+          response: syncErr.response,
+        })
+      : syncErr;
   }
 
   // Role Guard Check
@@ -281,7 +295,7 @@ export const registerWithEmailPassword = async ({
 
   // 5. Retrieve Firebase ID Token
   const firebaseToken = await user.getIdToken(true);
-  let activeToken = firebaseToken;
+  let activeToken = null;
 
   // 6. Call Backend Sync & Claim APIs: POST /api/auth/sync & POST /api/auth/claim-admin
   let backendData = null;
@@ -298,6 +312,8 @@ export const registerWithEmailPassword = async ({
 
     if (backendData?.accessToken) {
       activeToken = backendData.accessToken;
+    } else {
+      throw new Error("Backend authentication did not return an accessToken.");
     }
 
     // Set custom claim and verify admin status
@@ -309,7 +325,11 @@ export const registerWithEmailPassword = async ({
       }
     } catch {}
   } catch (syncErr) {
-    console.warn("Backend auth/sync notice:", syncErr?.message);
+    throw syncErr?.response?.data
+      ? Object.assign(new Error(syncErr.response.data.message || "Backend authorization failed."), {
+          response: syncErr.response,
+        })
+      : syncErr;
   }
 
   // 7. Verify Admin Role / Store Session
@@ -365,7 +385,7 @@ export const loginWithEmailPassword = async (email, password, rememberMe = false
 
   // 3. Retrieve Firebase ID Token
   const firebaseToken = await user.getIdToken();
-  let activeToken = firebaseToken;
+  let activeToken = null;
 
   // 4. Synchronize with Backend (POST /api/auth/sync & POST /api/auth/claim-admin)
   let backendData = null;
@@ -382,6 +402,8 @@ export const loginWithEmailPassword = async (email, password, rememberMe = false
 
     if (backendData?.accessToken) {
       activeToken = backendData.accessToken;
+    } else {
+      throw new Error("Backend authentication did not return an accessToken.");
     }
 
     try {
@@ -392,7 +414,11 @@ export const loginWithEmailPassword = async (email, password, rememberMe = false
       }
     } catch {}
   } catch (syncErr) {
-    console.warn("Backend auth/sync notice:", syncErr?.message);
+    throw syncErr?.response?.data
+      ? Object.assign(new Error(syncErr.response.data.message || "Backend authorization failed."), {
+          response: syncErr.response,
+        })
+      : syncErr;
   }
 
   // 5. Check Backend Response Role / Authorization Guard
@@ -454,7 +480,7 @@ export const loginWithGoogle = async () => {
   const userCredential = await signInWithPopup(auth, provider);
   const user = userCredential.user;
   const firebaseToken = await user.getIdToken(true);
-  let activeToken = firebaseToken;
+  let activeToken = null;
 
   // Synchronize with backend database: POST /api/auth/sync & POST /api/auth/claim-admin
   let backendData = null;
@@ -471,6 +497,8 @@ export const loginWithGoogle = async () => {
 
     if (backendData?.accessToken) {
       activeToken = backendData.accessToken;
+    } else {
+      throw new Error("Backend authentication did not return an accessToken.");
     }
 
     try {
@@ -481,7 +509,11 @@ export const loginWithGoogle = async () => {
       }
     } catch {}
   } catch (syncErr) {
-    console.warn("Backend auth/sync notice:", syncErr?.message);
+    throw syncErr?.response?.data
+      ? Object.assign(new Error(syncErr.response.data.message || "Backend authorization failed."), {
+          response: syncErr.response,
+        })
+      : syncErr;
   }
 
   const effectiveRole = String(backendData?.role || "ADMIN").toUpperCase();

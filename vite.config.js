@@ -29,6 +29,10 @@ export default defineConfig(({ mode }) => {
               })
             : undefined,
           configure: (proxy, _options) => {
+            proxy.on("proxyReq", (proxyReq) => {
+              proxyReq.removeHeader("origin");
+              proxyReq.removeHeader("referer");
+            });
             proxy.on('error', (err, _req, res) => {
               if (res && !res.headersSent && typeof res.writeHead === 'function') {
                 res.writeHead(502, { 'Content-Type': 'application/json' });
