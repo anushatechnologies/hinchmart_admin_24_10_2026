@@ -29,6 +29,7 @@ import {
   Percent,
   MapPin,
   Route,
+  Bike,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../firebase/AuthContext";
@@ -44,6 +45,7 @@ import { getAdminSellerTickets } from "../api/sellerTicketApi";
 import { getAdminCustomerTickets } from "../api/customerTicketApi";
 import { getTickets } from "../api/ticketApi";
 import { getPendingRefunds } from "../api/refundApi";
+import { getRiderApplications } from "../api/riderApi";
 
 export default function Sidebar({
   collapsed = false,
@@ -67,6 +69,7 @@ export default function Sidebar({
     sellerTickets: 0,
     customerTickets: 0,
     pendingRefunds: 0,
+    pendingRiderApplications: 0,
   }));
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export default function Sidebar({
           sellerTicketsData,
           customerTicketsData,
           refundsData,
+          riderAppsData,
         ] = await Promise.allSettled([
           getBuyers(),
           getSellers(),
@@ -101,6 +105,7 @@ export default function Sidebar({
           getAdminSellerTickets({ status: "OPEN", limit: 5 }),
           getAdminCustomerTickets({ status: "OPEN", limit: 5 }),
           getPendingRefunds(),
+          getRiderApplications({ status: "PENDING" }),
         ]);
 
         if (!mounted) return;
@@ -159,6 +164,11 @@ export default function Sidebar({
             ? refundsData.value.filter((r) => r.status !== "REFUNDED").length
             : 0;
 
+        const pendingRiderAppsCount =
+          riderAppsData.status === "fulfilled" && Array.isArray(riderAppsData.value)
+            ? riderAppsData.value.filter((a) => a.status === "PENDING").length
+            : 0;
+
         setCounts({
           buyers: buyersCount,
           sellers: sellersCount,
@@ -171,6 +181,7 @@ export default function Sidebar({
           sellerTickets: openSellerTicketsCount,
           customerTickets: openCustomerTicketsCount,
           pendingRefunds: pendingRefundsCount,
+          pendingRiderApplications: pendingRiderAppsCount,
         });
       } catch {
         if (!mounted) return;
@@ -277,6 +288,13 @@ export default function Sidebar({
           },
           { name: "Shipments & Logistics", path: "/admin/shipments", icon: Truck },
           { name: "Fulfillment Hubs", path: "/admin/hubs", icon: Building2 },
+          {
+            name: "Riders & Fleet",
+            path: "/admin/riders",
+            icon: Bike,
+            badge: counts.pendingRiderApplications > 0 ? counts.pendingRiderApplications : null,
+            badgeType: "orange",
+          },
           { name: "Pincode Serviceability", path: "/admin/pincodes", icon: MapPin },
           { name: "Delivery Pricing", path: "/admin/delivery-pricing", icon: Route },
           { name: "Reports & Analytics", path: "/admin/reports", icon: BarChart3 },

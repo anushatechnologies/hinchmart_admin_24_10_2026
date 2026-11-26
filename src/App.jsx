@@ -40,6 +40,7 @@ const CommissionRules = lazy(() => import("./pages/CommissionRules"));
 const Pincodes = lazy(() => import("./pages/Pincodes"));
 const DeliveryPricing = lazy(() => import("./pages/DeliveryPricing"));
 const Hubs = lazy(() => import("./pages/Hubs"));
+const Riders = lazy(() => import("./pages/Riders"));
 
 // Components
 import AdminLayout from "./components/AdminLayout";
@@ -60,6 +61,7 @@ import "./styles/dashboard.css";
 import "./styles/commissionRules.css";
 import "./styles/deliveryPricing.css";
 import "./styles/hubs.css";
+import "./styles/riders.css";
 
 function ProtectedAdminRoute() {
   const { isAuthenticated, loading } = useAuth();
@@ -154,6 +156,13 @@ function AppRoutes() {
           <Route path="delivery-pricing" element={<DeliveryPricing />} />
           <Route path="hubs" element={<Hubs />} />
           <Route path="logistics/hubs" element={<Hubs />} />
+          <Route path="riders" element={<Riders />} />
+          <Route path="riders/applications" element={<Riders defaultTab="applications" />} />
+          <Route path="riders/reactivations" element={<Riders defaultTab="reactivations" />} />
+          <Route path="riders/fleet" element={<Riders defaultTab="fleet" />} />
+          <Route path="fleet" element={<Riders defaultTab="fleet" />} />
+          <Route path="rider-applications" element={<Riders defaultTab="applications" />} />
+          <Route path="rider-reactivations" element={<Riders defaultTab="reactivations" />} />
           <Route path="rfqs" element={<RFQs />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
