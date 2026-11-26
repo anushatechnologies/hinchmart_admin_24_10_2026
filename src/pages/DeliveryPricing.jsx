@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -132,16 +133,23 @@ export default function DeliveryPricing() {
       toast.error("V41 Delivery Pricing backend routes are not deployed.");
       return;
     }
+    setError("");
     if (kind === "vehicle") setForm({ code: "", name: "", description: "", maxPayloadKg: "", maxLengthMm: "", maxWidthMm: "", maxHeightMm: "", maxVolumeCbm: "", requiresHeavyVehicleAccess: false, active: true, effectiveFrom: "", effectiveTo: "", displayOrder: 1 });
     if (kind === "area") setForm({ code: "", name: "", description: "", state: "", city: "", active: true, effectiveFrom: "", effectiveTo: "", pincodes: [] });
-    if (kind === "profile") setForm({ serviceAreaId: "", name: "", description: "", effectiveFrom: "", effectiveTo: "", active: true });
+    if (kind === "profile") setForm({ serviceAreaId: "", name: "", description: "", effectiveFrom: new Date().toISOString().slice(0, 16), effectiveTo: "", active: true });
     if (kind === "slab") setForm({ profileId: profiles[0]?.id || "", vehicleCategoryId: vehicles[0]?.id || "", fromDistanceKm: "0", toDistanceKm: "", pricingType: "FIXED", rateAmount: "", minimumCharge: "", additionalFlatCharge: "0", active: true, effectiveFrom: "", effectiveTo: "" });
     setModal(kind);
   };
 
   const openEdit = (kind, item) => {
+    setError("");
     setForm({
       ...item,
+      code: item.code || "",
+      name: item.name || "",
+      description: item.description || "",
+      state: item.state || "",
+      city: item.city || "",
       effectiveFrom: item.effectiveFrom || "",
       effectiveTo: item.effectiveTo || "",
       pincodes: item.pincodes || [],
@@ -150,7 +158,10 @@ export default function DeliveryPricing() {
   };
 
   const closeModal = () => {
-    if (!submitting) setModal(null);
+    if (!submitting) {
+      setModal(null);
+      setError("");
+    }
   };
 
   const save = async (event) => {
@@ -160,15 +171,52 @@ export default function DeliveryPricing() {
     setError("");
     try {
       if (modal === "vehicle") {
+        const trimmedCode = (form.code || "").trim().toUpperCase();
+        const trimmedName = (form.name || "").trim();
+        const trimmedDescription = typeof form.description === "string" ? form.description.trim() : "";
+
+        if (!trimmedCode) {
+          setError("Vehicle code is required.");
+          toast.error("Vehicle code is required.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedCode.length < 3 || trimmedCode.length > 50) {
+          setError("Vehicle code must be between 3 and 50 characters.");
+          toast.error("Vehicle code must be between 3 and 50 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (!trimmedName) {
+          setError("Vehicle name is required.");
+          toast.error("Vehicle name is required.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedName.length > 100) {
+          setError("Vehicle name cannot exceed 100 characters.");
+          toast.error("Vehicle name cannot exceed 100 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedDescription.length > 255) {
+          setError("Vehicle description cannot exceed 255 characters.");
+          toast.error("Vehicle description cannot exceed 255 characters.");
+          setSubmitting(false);
+          return;
+        }
+
         const payload = {
           ...form,
-          code: form.code?.toUpperCase(),
+          code: trimmedCode,
+          name: trimmedName,
+          description: trimmedDescription || null,
           maxPayloadKg: Number(form.maxPayloadKg || 0),
           maxLengthMm: Number(form.maxLengthMm || 0),
           maxWidthMm: Number(form.maxWidthMm || 0),
           maxHeightMm: Number(form.maxHeightMm || 0),
           maxVolumeCbm: Number(form.maxVolumeCbm || 0),
-          displayOrder: Number(form.displayOrder || 1),
+          displayOrder: Number(form.displayOrder || 0),
           effectiveFrom: form.effectiveFrom || null,
           effectiveTo: form.effectiveTo || null,
         };
@@ -176,19 +224,131 @@ export default function DeliveryPricing() {
         toast.success(form.id ? "Vehicle category updated." : "Vehicle category created.");
       }
       if (modal === "area") {
+        const trimmedCode = (form.code || "").trim().toUpperCase();
+        const trimmedName = (form.name || "").trim();
+        const trimmedState = (form.state || "").trim();
+        const trimmedCity = typeof form.city === "string" ? form.city.trim() : "";
+        const trimmedDescription = typeof form.description === "string" ? form.description.trim() : "";
+
+        if (!trimmedCode) {
+          setError("Service area code is required.");
+          toast.error("Service area code is required.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedCode.length < 3 || trimmedCode.length > 50) {
+          setError("Service area code must be between 3 and 50 characters.");
+          toast.error("Service area code must be between 3 and 50 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (!trimmedName) {
+          setError("Service area name is required.");
+          toast.error("Service area name is required.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedName.length > 100) {
+          setError("Service area name cannot exceed 100 characters.");
+          toast.error("Service area name cannot exceed 100 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (!trimmedState) {
+          setError("State is required.");
+          toast.error("State is required.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedState.length > 100) {
+          setError("State cannot exceed 100 characters.");
+          toast.error("State cannot exceed 100 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedCity.length > 100) {
+          setError("City cannot exceed 100 characters.");
+          toast.error("City cannot exceed 100 characters.");
+          setSubmitting(false);
+          return;
+        }
+        if (trimmedDescription.length > 255) {
+          setError("Service area description cannot exceed 255 characters.");
+          toast.error("Service area description cannot exceed 255 characters.");
+          setSubmitting(false);
+          return;
+        }
+
+        const cleanedPincodes = Array.isArray(form.pincodes)
+          ? form.pincodes
+            .map((p) => String(p).replace(/\D/g, "").slice(0, 6))
+            .filter((p) => p.length === 6)
+          : [];
+
         const payload = {
           ...form,
-          code: form.code?.toUpperCase(),
+          code: trimmedCode,
+          name: trimmedName,
+          state: trimmedState,
+          city: trimmedCity || null,
+          description: trimmedDescription || null,
           effectiveFrom: form.effectiveFrom || null,
           effectiveTo: form.effectiveTo || null,
-          pincodes: Array.isArray(form.pincodes) ? form.pincodes : [],
+          pincodes: cleanedPincodes,
         };
         form.id ? await DeliveryService.updateServiceArea(form.id, payload) : await DeliveryService.createServiceArea(payload);
         toast.success(form.id ? "Service area updated." : "Service area created.");
       }
       if (modal === "profile") {
+        const rawName = form.name ?? "";
+        const rawDescription = form.description ?? "";
+        const trimmedName = typeof rawName === "string" ? rawName.trim() : "";
+        const trimmedDescription = typeof rawDescription === "string" ? rawDescription.trim() : "";
+
+        if (!form.serviceAreaId) {
+          const msg = "Service area is required.";
+          setError(msg);
+          toast.error(msg);
+          setSubmitting(false);
+          return;
+        }
+
+        if (!trimmedName) {
+          const msg = "Profile name is required.";
+          setError(msg);
+          toast.error(msg);
+          setSubmitting(false);
+          return;
+        }
+
+        if (trimmedName.length > 100) {
+          const msg = "Profile name cannot exceed 100 characters.";
+          setError(msg);
+          toast.error(msg);
+          setSubmitting(false);
+          return;
+        }
+
+        if (trimmedDescription.length > 255) {
+          const msg = "Profile description cannot exceed 255 characters.";
+          setError(msg);
+          toast.error(msg);
+          setSubmitting(false);
+          return;
+        }
+
+        if (!form.effectiveFrom) {
+          const msg = "Effective from date is required.";
+          setError(msg);
+          toast.error(msg);
+          setSubmitting(false);
+          return;
+        }
+
         const payload = {
           ...form,
+          name: trimmedName,
+          description: trimmedDescription || null,
           serviceAreaId: Number(form.serviceAreaId),
           effectiveFrom: form.effectiveFrom || null,
           effectiveTo: form.effectiveTo || null,
@@ -289,36 +449,235 @@ export default function DeliveryPricing() {
     <>
       {modal === "vehicle" && (
         <div className="delivery-form-grid">
-          <label>Code<input required value={form.code || ""} disabled={Boolean(form.id)} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label>
-          <label>Name<input required value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label className="delivery-span-2">Description<textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <label>Max payload (kg)<input required type="number" step="0.001" value={form.maxPayloadKg ?? ""} onChange={(e) => setForm({ ...form, maxPayloadKg: e.target.value })} /></label>
-          <label>Display order<input type="number" value={form.displayOrder ?? 1} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} /></label>
-          <label>Length (mm)<input type="number" value={form.maxLengthMm ?? ""} onChange={(e) => setForm({ ...form, maxLengthMm: e.target.value })} /></label>
-          <label>Width (mm)<input type="number" value={form.maxWidthMm ?? ""} onChange={(e) => setForm({ ...form, maxWidthMm: e.target.value })} /></label>
-          <label>Height (mm)<input type="number" value={form.maxHeightMm ?? ""} onChange={(e) => setForm({ ...form, maxHeightMm: e.target.value })} /></label>
-          <label>Max volume (cbm)<input type="number" step="0.0001" value={form.maxVolumeCbm ?? ""} onChange={(e) => setForm({ ...form, maxVolumeCbm: e.target.value })} /></label>
+          <label>
+            <div className="delivery-field-header">
+              <span>Code *</span>
+              <span className={`delivery-char-counter ${(form.code || "").length >= 50 ? "delivery-char-limit" : ""}`}>
+                {(form.code || "").length}/50
+              </span>
+            </div>
+            <input
+              required
+              maxLength={50}
+              style={{ textTransform: "uppercase" }}
+              className={(form.code || "").length >= 50 ? "delivery-input-limit" : ""}
+              value={form.code || ""}
+              disabled={Boolean(form.id)}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "") })}
+              placeholder="e.g. MEDIUM_TRUCK_14FT"
+            />
+            {(form.code || "").length >= 50 && (
+              <span className="delivery-field-error">Maximum 50 characters reached.</span>
+            )}
+          </label>
+          <label>
+            <div className="delivery-field-header">
+              <span>Name *</span>
+              <span className={`delivery-char-counter ${(form.name || "").length >= 100 ? "delivery-char-limit" : ""}`}>
+                {(form.name || "").length}/100
+              </span>
+            </div>
+            <input
+              required
+              maxLength={100}
+              className={(form.name || "").length >= 100 ? "delivery-input-limit" : ""}
+              value={form.name || ""}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Medium Truck 14ft"
+            />
+            {(form.name || "").length >= 100 && (
+              <span className="delivery-field-error">Maximum 100 characters reached.</span>
+            )}
+          </label>
+          <label className="delivery-span-2">
+            <div className="delivery-field-header">
+              <span>Description</span>
+              <span className={`delivery-char-counter ${(form.description || "").length >= 255 ? "delivery-char-limit" : ""}`}>
+                {(form.description || "").length}/255
+              </span>
+            </div>
+            <textarea
+              maxLength={255}
+              className={(form.description || "").length >= 255 ? "delivery-input-limit" : ""}
+              value={form.description || ""}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Optional vehicle description (max 255 characters)..."
+            />
+            {(form.description || "").length >= 255 && (
+              <span className="delivery-field-error">Maximum 255 characters reached.</span>
+            )}
+          </label>
+          <label>Max payload (kg)<input required type="number" step="0.001" min="0.1" value={form.maxPayloadKg ?? ""} onChange={(e) => setForm({ ...form, maxPayloadKg: e.target.value })} /></label>
+          <label>Display order<input type="number" min="0" value={form.displayOrder ?? 1} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} /></label>
+          <label>Length (mm)<input required type="number" min="100" value={form.maxLengthMm ?? ""} onChange={(e) => setForm({ ...form, maxLengthMm: e.target.value })} /></label>
+          <label>Width (mm)<input required type="number" min="100" value={form.maxWidthMm ?? ""} onChange={(e) => setForm({ ...form, maxWidthMm: e.target.value })} /></label>
+          <label>Height (mm)<input required type="number" min="100" value={form.maxHeightMm ?? ""} onChange={(e) => setForm({ ...form, maxHeightMm: e.target.value })} /></label>
+          <label>Max volume (cbm)<input required type="number" step="0.0001" min="0.001" value={form.maxVolumeCbm ?? ""} onChange={(e) => setForm({ ...form, maxVolumeCbm: e.target.value })} /></label>
           <label className="delivery-check"><input type="checkbox" checked={Boolean(form.requiresHeavyVehicleAccess)} onChange={(e) => setForm({ ...form, requiresHeavyVehicleAccess: e.target.checked })} /> Requires heavy vehicle access</label>
           <label className="delivery-check"><input type="checkbox" checked={Boolean(form.active)} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active</label>
         </div>
       )}
       {modal === "area" && (
         <div className="delivery-form-grid">
-          <label>Code<input required value={form.code || ""} disabled={Boolean(form.id)} onChange={(e) => setForm({ ...form, code: e.target.value })} /></label>
-          <label>Name<input required value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>State<input value={form.state || ""} onChange={(e) => setForm({ ...form, state: e.target.value })} /></label>
-          <label>City<input value={form.city || ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></label>
-          <label className="delivery-span-2">Description<textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <label className="delivery-span-2">Pincodes <small>Comma separated</small><input value={(form.pincodes || []).join(",")} onChange={(e) => setForm({ ...form, pincodes: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })} /></label>
+          <label>
+            <div className="delivery-field-header">
+              <span>Code *</span>
+              <span className={`delivery-char-counter ${(form.code || "").length >= 50 ? "delivery-char-limit" : ""}`}>
+                {(form.code || "").length}/50
+              </span>
+            </div>
+            <input
+              required
+              maxLength={50}
+              style={{ textTransform: "uppercase" }}
+              className={(form.code || "").length >= 50 ? "delivery-input-limit" : ""}
+              value={form.code || ""}
+              disabled={Boolean(form.id)}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "") })}
+              placeholder="e.g. HYD_METRO_CORE"
+            />
+            {(form.code || "").length >= 50 && (
+              <span className="delivery-field-error">Maximum 50 characters reached.</span>
+            )}
+          </label>
+          <label>
+            <div className="delivery-field-header">
+              <span>Name *</span>
+              <span className={`delivery-char-counter ${(form.name || "").length >= 100 ? "delivery-char-limit" : ""}`}>
+                {(form.name || "").length}/100
+              </span>
+            </div>
+            <input
+              required
+              maxLength={100}
+              className={(form.name || "").length >= 100 ? "delivery-input-limit" : ""}
+              value={form.name || ""}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Hyderabad Metro Core"
+            />
+            {(form.name || "").length >= 100 && (
+              <span className="delivery-field-error">Maximum 100 characters reached.</span>
+            )}
+          </label>
+          <label>
+            <div className="delivery-field-header">
+              <span>State *</span>
+              <span className={`delivery-char-counter ${(form.state || "").length >= 100 ? "delivery-char-limit" : ""}`}>
+                {(form.state || "").length}/100
+              </span>
+            </div>
+            <input
+              required
+              maxLength={100}
+              className={(form.state || "").length >= 100 ? "delivery-input-limit" : ""}
+              value={form.state || ""}
+              onChange={(e) => setForm({ ...form, state: e.target.value })}
+              placeholder="e.g. Telangana"
+            />
+            {(form.state || "").length >= 100 && (
+              <span className="delivery-field-error">Maximum 100 characters reached.</span>
+            )}
+          </label>
+          <label>
+            <div className="delivery-field-header">
+              <span>City</span>
+              <span className={`delivery-char-counter ${(form.city || "").length >= 100 ? "delivery-char-limit" : ""}`}>
+                {(form.city || "").length}/100
+              </span>
+            </div>
+            <input
+              maxLength={100}
+              className={(form.city || "").length >= 100 ? "delivery-input-limit" : ""}
+              value={form.city || ""}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              placeholder="e.g. Hyderabad"
+            />
+            {(form.city || "").length >= 100 && (
+              <span className="delivery-field-error">Maximum 100 characters reached.</span>
+            )}
+          </label>
+          <label className="delivery-span-2">
+            <div className="delivery-field-header">
+              <span>Description</span>
+              <span className={`delivery-char-counter ${(form.description || "").length >= 255 ? "delivery-char-limit" : ""}`}>
+                {(form.description || "").length}/255
+              </span>
+            </div>
+            <textarea
+              maxLength={255}
+              className={(form.description || "").length >= 255 ? "delivery-input-limit" : ""}
+              value={form.description || ""}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Optional service area description (max 255 characters)..."
+            />
+            {(form.description || "").length >= 255 && (
+              <span className="delivery-field-error">Maximum 255 characters reached.</span>
+            )}
+          </label>
+          <label className="delivery-span-2">
+            Pincodes <small>Comma separated (6-digit numbers only)</small>
+            <input
+              value={(form.pincodes || []).join(", ")}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const tokens = raw.split(",").map((v) => v.trim().replace(/\D/g, "").slice(0, 6));
+                setForm({ ...form, pincodes: tokens });
+              }}
+              placeholder="500081, 500032, 500084"
+            />
+          </label>
           <label className="delivery-check"><input type="checkbox" checked={Boolean(form.active)} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active</label>
         </div>
       )}
       {modal === "profile" && (
         <div className="delivery-form-grid">
           <label>Service area<select required value={form.serviceAreaId || ""} onChange={(e) => setForm({ ...form, serviceAreaId: e.target.value })}><option value="">Select area</option>{areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label>
-          <label>Name<input required value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label className="delivery-span-2">Description<textarea value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <label>Effective from<input type="datetime-local" value={form.effectiveFrom?.slice(0, 16) || ""} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label>
+          <label>
+            <div className="delivery-field-header">
+              <span>Name *</span>
+              <span className={`delivery-char-counter ${(form.name || "").length >= 100 ? "delivery-char-limit" : ""}`}>
+                {(form.name || "").length}/100
+              </span>
+            </div>
+            <input
+              required
+              maxLength={100}
+              className={(form.name || "").length >= 100 ? "delivery-input-limit" : ""}
+              value={form.name || ""}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Standard Regional Pricing"
+            />
+            {(form.name || "").length >= 100 && (
+              <span className="delivery-field-error">
+                {(form.name || "").length > 100
+                  ? "Profile name cannot exceed 100 characters."
+                  : "Maximum 100 characters reached."}
+              </span>
+            )}
+          </label>
+          <label className="delivery-span-2">
+            <div className="delivery-field-header">
+              <span>Description</span>
+              <span className={`delivery-char-counter ${(form.description || "").length >= 255 ? "delivery-char-limit" : ""}`}>
+                {(form.description || "").length}/255
+              </span>
+            </div>
+            <textarea
+              maxLength={255}
+              className={(form.description || "").length >= 255 ? "delivery-input-limit" : ""}
+              value={form.description || ""}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="Short description of this pricing profile (max 255 characters)..."
+            />
+            {(form.description || "").length >= 255 && (
+              <span className="delivery-field-error">
+                {(form.description || "").length > 255
+                  ? "Profile description cannot exceed 255 characters."
+                  : "Maximum 255 characters reached."}
+              </span>
+            )}
+          </label>
+          <label>Effective from *<input required type="datetime-local" value={form.effectiveFrom?.slice(0, 16) || ""} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} /></label>
           <label>Effective to<input type="datetime-local" value={form.effectiveTo?.slice(0, 16) || ""} onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })} /></label>
           <label className="delivery-check"><input type="checkbox" checked={Boolean(form.active)} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Active</label>
         </div>
@@ -536,7 +895,17 @@ export default function DeliveryPricing() {
         <div className="delivery-modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && closeModal()}>
           <form className="delivery-modal" onSubmit={save}>
             <header><div><h2>{form.id ? "Edit" : "Create"} {modal === "slab" ? "distance slab" : modal}</h2><p>Changes are validated and persisted by the backend.</p></div><button type="button" onClick={closeModal}><X size={17} /></button></header>
-            <div className="delivery-modal-body">{renderModalFields()}</div>
+            <div className="delivery-modal-body">
+              {error && (
+                <div className="delivery-error">
+                  <span>{error}</span>
+                  <button type="button" onClick={() => setError("")}>
+                    <X size={15} />
+                  </button>
+                </div>
+              )}
+              {renderModalFields()}
+            </div>
             <footer><button type="button" onClick={closeModal} disabled={submitting}>Cancel</button><button className="delivery-primary" type="submit" disabled={submitting}>{submitting && <Loader2 size={15} className="delivery-spin" />} Save</button></footer>
           </form>
         </div>

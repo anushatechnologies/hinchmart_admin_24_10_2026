@@ -276,6 +276,7 @@ export default function Sidebar({
             badgeType: "orange",
           },
           { name: "Shipments & Logistics", path: "/admin/shipments", icon: Truck },
+          { name: "Fulfillment Hubs", path: "/admin/hubs", icon: Building2 },
           { name: "Pincode Serviceability", path: "/admin/pincodes", icon: MapPin },
           { name: "Delivery Pricing", path: "/admin/delivery-pricing", icon: Route },
           { name: "Reports & Analytics", path: "/admin/reports", icon: BarChart3 },
