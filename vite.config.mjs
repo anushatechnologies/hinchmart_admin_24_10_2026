@@ -1,52 +1,52 @@
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-import https from 'node:https'
+import { defineConfig, loadEnv } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  const rawTarget = env.VITE_API_BASE_URL || env.VITE_API_URL || 'https://api.hinchmart.com';
-  // Strip trailing slashes and /api so proxy doesn't double-nest /api/api
-  const cleanTarget = rawTarget.replace(/\/+$/, '').replace(/\/api$/, '');
+  const env = loadEnv(mode, process.cwd(), "");
+  const mainTarget = (env.VITE_API_BASE_URL || env.VITE_API_URL || "https://api.hinchmart.com")
+    .replace(/\/+$/, "")
+    .replace(/\/api$/, "");
+  const expressTarget = env.VITE_EXPRESS_API_BASE_URL || env.EXPRESS_API_URL;
+
+  const proxyConfig = {};
+
+  if (expressTarget) {
+    const cleanExpress = expressTarget.replace(/\/+$/, "").replace(/\/api$/, "");
+    proxyConfig["/api/v1/admin/rider-"] = {
+      target: cleanExpress,
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, "/api"),
+    };
+    proxyConfig["/api/v1/dispatcher"] = {
+      target: cleanExpress,
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, "/api"),
+    };
+  }
+
+  proxyConfig["/api"] = {
+    target: mainTarget,
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\/api/, "/api"),
+    configure: (proxy) => {
+      proxy.on("proxyReq", (proxyReq) => {
+        proxyReq.removeHeader("origin");
+        proxyReq.removeHeader("referer");
+      });
+    },
+  };
 
   return {
     plugins: [react()],
     server: {
-      port: 5174,
-      hmr: {
-        protocol: 'ws',
-        host: 'localhost',
+      port: 5173,
+      host: true,
+      watch: {
+        usePolling: true,
+        interval: 1000,
+        ignored: ["**/vite.config.js"],
       },
-      proxy: {
-        '/api': {
-          target: cleanTarget,
-          changeOrigin: true,
-          secure: false,
-          timeout: 60000,
-          proxyTimeout: 60000,
-          agent: cleanTarget.startsWith('https')
-            ? new https.Agent({
-                rejectUnauthorized: false,
-                keepAlive: true,
-              })
-            : undefined,
-          configure: (proxy, _options) => {
-            proxy.on("proxyReq", (proxyReq) => {
-              proxyReq.removeHeader("origin");
-              proxyReq.removeHeader("referer");
-            });
-            proxy.on('error', (err, _req, res) => {
-              if (res && !res.headersSent && typeof res.writeHead === 'function') {
-                res.writeHead(502, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                  error: 'Backend API is currently offline/unreachable',
-                  message: err.message,
-                  target: cleanTarget
-                }));
-              }
-            });
-          },
-        },
-      },
+      proxy: proxyConfig,
     },
   };
 });
