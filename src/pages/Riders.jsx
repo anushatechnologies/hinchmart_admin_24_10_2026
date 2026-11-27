@@ -35,7 +35,7 @@ import {
   rejectReactivationRequest,
   getRiderVehicleCategory,
   updateRiderVehicleCategory,
-} from "../api/riderApi";
+} from "../api/riderService";
 import { getHubs } from "../api/hubApi";
 import { useToast } from "../components/ToastContext";
 import { useAuth } from "../firebase/AuthContext";

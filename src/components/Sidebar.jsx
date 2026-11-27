@@ -45,7 +45,7 @@ import { getAdminSellerTickets } from "../api/sellerTicketApi";
 import { getAdminCustomerTickets } from "../api/customerTicketApi";
 import { getTickets } from "../api/ticketApi";
 import { getPendingRefunds } from "../api/refundApi";
-import { getRiderApplications } from "../api/riderApi";
+import { getRiderApplications } from "../api/riderService";
 
 export default function Sidebar({
   collapsed = false,

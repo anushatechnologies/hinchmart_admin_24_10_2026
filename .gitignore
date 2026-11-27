@@ -14,7 +14,9 @@ dist-ssr
 push_to_github.bat
 
 # Editor directories and files
+# Local corrupted exFAT entries
 vite.config.js
+src/api/riderApi.js
 .vscode/*
 !.vscode/extensions.json
 .idea
