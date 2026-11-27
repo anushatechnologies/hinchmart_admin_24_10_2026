@@ -3,6 +3,27 @@ import api from "./axios";
 const STORAGE_KEY_APPLICATIONS = "hinchmart_admin_rider_applications_v1";
 const STORAGE_KEY_REACTIVATIONS = "hinchmart_admin_rider_reactivations_v1";
 const STORAGE_KEY_FLEET = "hinchmart_admin_rider_fleet_v1";
+const STORAGE_KEY_RIDERS_COOLDOWN = "hinchmart_admin_riders_cooldown_v1";
+
+// 15-minute cooldown to avoid spamming the console with 404s when the backend
+// express service endpoints are not yet deployed to https://api.hinchmart.com
+const ENDPOINT_FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
+
+export const getRidersCooldownUntil = () => {
+  if (typeof window === "undefined") return 0;
+  try {
+    return Number(localStorage.getItem(STORAGE_KEY_RIDERS_COOLDOWN)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const setRidersCooldownUntil = (timestamp) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY_RIDERS_COOLDOWN, String(timestamp));
+  } catch {}
+};
 
 const unwrapData = (res) => (res?.data?.data !== undefined ? res.data.data : res.data);
 
@@ -473,6 +494,63 @@ export const saveStoredFleet = (fleet) => {
   } catch {}
 };
 
+export const filterStoredApplications = (params = {}) => {
+  let list = getStoredApplications();
+  if (params.status && params.status !== "ALL") {
+    list = list.filter((a) => a.status?.toUpperCase() === params.status.toUpperCase());
+  }
+  if (params.search) {
+    const q = params.search.toLowerCase();
+    list = list.filter(
+      (a) =>
+        a.applicantName?.toLowerCase().includes(q) ||
+        a.phone?.includes(q) ||
+        a.city?.toLowerCase().includes(q) ||
+        a.id?.toLowerCase().includes(q)
+    );
+  }
+  return list;
+};
+
+export const filterStoredReactivations = (params = {}) => {
+  let list = getStoredReactivations();
+  if (params.riderId) {
+    list = list.filter((r) => r.riderId === params.riderId);
+  }
+  if (params.status && params.status !== "ALL") {
+    list = list.filter((r) => r.status?.toUpperCase() === params.status.toUpperCase());
+  }
+  return list;
+};
+
+export const filterStoredFleet = (params = {}) => {
+  let list = getStoredFleet();
+  if (params.operationalStatus && params.operationalStatus !== "ALL") {
+    list = list.filter((r) => r.operationalStatus === params.operationalStatus);
+  }
+  if (params.hubId && params.hubId !== "ALL") {
+    list = list.filter((r) => r.hubId === params.hubId);
+  }
+  if (params.vehicleCategory && params.vehicleCategory !== "ALL") {
+    list = list.filter((r) => r.vehicleCategory === params.vehicleCategory);
+  }
+  if (params.isEligible !== undefined && params.isEligible !== "") {
+    const want = String(params.isEligible) === "true";
+    list = list.filter((r) => Boolean(r.dispatchEligibility?.isEligible) === want);
+  }
+  if (params.search) {
+    const q = params.search.toLowerCase();
+    list = list.filter(
+      (r) =>
+        r.name?.toLowerCase().includes(q) ||
+        r.phone?.includes(q) ||
+        r.vehicleNumber?.toLowerCase().includes(q) ||
+        r.riderId?.toLowerCase().includes(q)
+    );
+  }
+  return list;
+};
+
 // ===========================================================================
 // 1. Rider Onboarding & KYC Review (AdminRiderApplicationController)
 // Base path: /v1/admin/rider-applications
@@ -483,6 +561,9 @@ export const saveStoredFleet = (fleet) => {
  * Paginated list of rider applications (Requires: RIDER_APPLICATION_REVIEW)
  */
 export const getRiderApplications = async (params = {}) => {
+  if (Date.now() < getRidersCooldownUntil()) {
+    return filterStoredApplications(params);
+  }
   try {
     const res = await api.get("/v1/admin/rider-applications", { params });
     const data = unwrapData(res);
@@ -499,21 +580,10 @@ export const getRiderApplications = async (params = {}) => {
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 502 || status === 504 || !err.response) {
-      let list = getStoredApplications();
-      if (params.status && params.status !== "ALL") {
-        list = list.filter((a) => a.status?.toUpperCase() === params.status.toUpperCase());
+      if (status === 404) {
+        setRidersCooldownUntil(Date.now() + ENDPOINT_FAILURE_COOLDOWN_MS);
       }
-      if (params.search) {
-        const q = params.search.toLowerCase();
-        list = list.filter(
-          (a) =>
-            a.applicantName?.toLowerCase().includes(q) ||
-            a.phone?.includes(q) ||
-            a.city?.toLowerCase().includes(q) ||
-            a.id?.toLowerCase().includes(q)
-        );
-      }
-      return list;
+      return filterStoredApplications(params);
     }
     throw err.response?.data || err;
   }
@@ -758,6 +828,9 @@ export const createReactivationRequest = async (riderId, payload) => {
  * List reactivation requests
  */
 export const getReactivationRequests = async (params = {}) => {
+  if (Date.now() < getRidersCooldownUntil()) {
+    return filterStoredReactivations(params);
+  }
   try {
     const res = await api.get("/v1/admin/rider-reactivations", { params });
     const data = unwrapData(res);
@@ -774,14 +847,10 @@ export const getReactivationRequests = async (params = {}) => {
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 502 || !err.response) {
-      let list = getStoredReactivations();
-      if (params.riderId) {
-        list = list.filter((r) => r.riderId === params.riderId);
+      if (status === 404) {
+        setRidersCooldownUntil(Date.now() + ENDPOINT_FAILURE_COOLDOWN_MS);
       }
-      if (params.status && params.status !== "ALL") {
-        list = list.filter((r) => r.status?.toUpperCase() === params.status.toUpperCase());
-      }
-      return list;
+      return filterStoredReactivations(params);
     }
     throw err.response?.data || err;
   }
@@ -1027,6 +1096,9 @@ export const updateRiderVehicleCategory = async (riderId, payload) => {
  * Operational status, availability, Redis presence, active assignments, and dispatch eligibility (DISPATCH_VIEW or DISPATCH_ASSIGNMENT)
  */
 export const getFleetRiders = async (params = {}) => {
+  if (Date.now() < getRidersCooldownUntil()) {
+    return filterStoredFleet(params);
+  }
   try {
     // Primary path: /v1/dispatcher/riders
     const res = await api.get("/v1/dispatcher/riders", { params });
@@ -1041,7 +1113,12 @@ export const getFleetRiders = async (params = {}) => {
       return list;
     }
     return data || [];
-  } catch {
+  } catch (primaryErr) {
+    const status = primaryErr?.response?.status;
+    if (status === 404) {
+      setRidersCooldownUntil(Date.now() + ENDPOINT_FAILURE_COOLDOWN_MS);
+      return filterStoredFleet(params);
+    }
     // Secondary fallback alias: /v1/dispatcher/fleet
     try {
       const aliasRes = await api.get("/v1/dispatcher/fleet", { params });
@@ -1052,31 +1129,7 @@ export const getFleetRiders = async (params = {}) => {
       }
       return data || [];
     } catch {
-      let list = getStoredFleet();
-      if (params.operationalStatus && params.operationalStatus !== "ALL") {
-        list = list.filter((r) => r.operationalStatus === params.operationalStatus);
-      }
-      if (params.hubId && params.hubId !== "ALL") {
-        list = list.filter((r) => r.hubId === params.hubId);
-      }
-      if (params.vehicleCategory && params.vehicleCategory !== "ALL") {
-        list = list.filter((r) => r.vehicleCategory === params.vehicleCategory);
-      }
-      if (params.isEligible !== undefined && params.isEligible !== "") {
-        const want = String(params.isEligible) === "true";
-        list = list.filter((r) => Boolean(r.dispatchEligibility?.isEligible) === want);
-      }
-      if (params.search) {
-        const q = params.search.toLowerCase();
-        list = list.filter(
-          (r) =>
-            r.name?.toLowerCase().includes(q) ||
-            r.phone?.includes(q) ||
-            r.vehicleNumber?.toLowerCase().includes(q) ||
-            r.riderId?.toLowerCase().includes(q)
-        );
-      }
-      return list;
+      return filterStoredFleet(params);
     }
   }
 };
